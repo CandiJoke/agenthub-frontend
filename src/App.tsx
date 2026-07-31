@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
-import { streamChat, type SSEEvent } from "./sse";
+import { streamChat, type ChatStreamEvent } from "./api/chat";
+import { API_BASE_URL } from "./config/env";
 
 interface Step {
   id: number;
@@ -36,10 +37,10 @@ export default function App() {
 
     setReplies((prev) => [...prev, userMsg]);
 
-    streamChat(
-      text,
+    streamChat({
+      message: text,
       sessionId,
-      (event: SSEEvent) => {
+      onEvent: (event: ChatStreamEvent) => {
         if (event.type === "tool_start") {
           steps.push({ id: Date.now(), type: "tool_start", tool: event.tool, content: event.input });
           setToolStatus(`🔧 调用 ${event.tool}...`);
@@ -76,19 +77,19 @@ export default function App() {
           });
         }
       },
-      () => {
+      onDone: () => {
         setLoading(false);
         setToolStatus("");
       },
-      (err) => {
+      onError: (err) => {
         setLoading(false);
         setToolStatus("");
         setReplies((prev) => [
           ...prev,
           { role: "agent", content: `❌ 出错了：${err}`, steps: [] },
         ]);
-      }
-    );
+      },
+    });
 
     // 先插入空的 agent 占位
     setReplies((prev) => [...prev, { role: "agent", content: "", steps: [] }]);
@@ -223,7 +224,7 @@ export default function App() {
       </div>
 
       <div style={{ textAlign: "center", marginTop: 16, fontSize: 12, color: "#bbb" }}>
-        后端: localhost:8001 | 会话: {sessionId.slice(-8)}
+        后端: {API_BASE_URL} | 会话: {sessionId.slice(-8)}
       </div>
     </div>
   );
