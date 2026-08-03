@@ -1,9 +1,18 @@
 import { postSseStream } from "../request/stream";
 
+export type ChatStage =
+  | "received"
+  | "planning"
+  | "tooling"
+  | "answering"
+  | "completed";
+
 export type ChatStreamEvent =
+  | { type: "stage"; stage: ChatStage; message: string }
   | { type: "tool_start"; tool: string; input: string }
-  | { type: "tool_end"; tool: string; output: string }
-  | { type: "text"; content: string };
+  | { type: "tool_end"; tool: string; output: string; elapsed_ms?: number }
+  | { type: "text"; content: string }
+  | { type: "error"; message: string };
 
 export interface StreamChatOptions {
   message: string;
