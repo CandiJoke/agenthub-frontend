@@ -14,6 +14,7 @@ export type TimelineItem =
       id: string;
       kind: "tool";
       tool: string;
+      runId?: string;
       input: string;
       output?: string;
       elapsedMs?: number;
@@ -78,15 +79,15 @@ export function appendChatStreamEvent(
   }
 
   if (event.type === "tool_start") {
-    const timeline = completeRunningItems(message.timeline);
     return {
       ...message,
       timeline: [
-        ...timeline,
+        ...message.timeline,
         {
-          id: nextTimelineId("tool", timeline),
+          id: nextTimelineId("tool", message.timeline),
           kind: "tool",
           tool: event.tool,
+          runId: event.run_id,
           input: event.input,
           status: "running",
         },
@@ -101,6 +102,7 @@ export function appendChatStreamEvent(
       event.tool,
       event.output,
       event.elapsed_ms,
+      event.run_id,
     );
     return {
       ...message,
@@ -158,7 +160,9 @@ function appendStageEvent(
   stageMessage: string,
 ): AgentChatMessage {
   const status: TimelineStatus = stage === "completed" ? "completed" : "running";
-  const timeline = completeRunningItems(message.timeline);
+  const timeline = stage === "completed"
+    ? completeRunningItems(message.timeline)
+    : completeRunningNonToolItems(message.timeline);
   return {
     ...message,
     timeline: [
@@ -176,6 +180,13 @@ function appendStageEvent(
   };
 }
 
+function completeRunningNonToolItems(timeline: TimelineItem[]): TimelineItem[] {
+  return timeline.map((item) => {
+    if (item.kind === "tool" || item.status !== "running") return item;
+    return { ...item, status: "completed" };
+  });
+}
+
 function completeRunningItems(
   timeline: TimelineItem[],
   status: TimelineStatus = "completed",
@@ -191,29 +202,49 @@ function completeLatestTool(
   tool: string,
   output: string,
   elapsedMs?: number,
+  runId?: string,
 ): TimelineItem[] {
-  let matched = false;
-  const updated = [...timeline].reverse().map((item) => {
-    if (!matched && item.kind === "tool" && item.tool === tool && item.status === "running") {
-      matched = true;
+  let matchIndex = -1;
+
+  if (runId !== undefined) {
+    for (let index = timeline.length - 1; index >= 0; index -= 1) {
+      const item = timeline[index];
+      if (item.kind === "tool" && item.runId === runId && item.status === "running") {
+        matchIndex = index;
+        break;
+      }
+    }
+  }
+
+  if (matchIndex === -1) {
+    for (let index = timeline.length - 1; index >= 0; index -= 1) {
+      const item = timeline[index];
+      if (item.kind === "tool" && item.tool === tool && item.status === "running") {
+        matchIndex = index;
+        break;
+      }
+    }
+  }
+
+  if (matchIndex !== -1) {
+    return timeline.map((item, index) => {
+      if (index !== matchIndex || item.kind !== "tool") return item;
       return {
         ...item,
         output,
         elapsedMs,
-        status: "completed" as const,
+        status: "completed",
       };
-    }
-    return item;
-  }).reverse();
-
-  if (matched) return updated;
+    });
+  }
 
   return [
-    ...completeRunningItems(timeline),
+    ...timeline,
     {
       id: nextTimelineId("tool", timeline),
       kind: "tool",
       tool,
+      runId,
       input: "",
       output,
       elapsedMs,
@@ -227,7 +258,7 @@ function ensureAnswerItem(timeline: TimelineItem[]): TimelineItem[] {
     return timeline;
   }
 
-  const completed = completeRunningItems(timeline);
+  const completed = completeRunningNonToolItems(timeline);
   return [
     ...completed,
     {

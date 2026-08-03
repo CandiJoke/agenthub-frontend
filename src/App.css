@@ -252,7 +252,8 @@
 }
 
 .pulse-dot,
-.steady-dot {
+.steady-dot,
+.error-dot {
   width: 8px;
   height: 8px;
   flex: 0 0 auto;
@@ -266,6 +267,22 @@
 
 .steady-dot {
   background: #0f9f6e;
+}
+
+.error-dot {
+  background: #dc2626;
+}
+
+.agent-error-banner {
+  max-width: min(720px, 86%);
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  padding: 9px 12px;
+  color: #991b1b;
+  background: #fef2f2;
+  font-size: 13px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
 }
 
 .composer {

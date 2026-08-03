@@ -9,8 +9,14 @@ export type ChatStage =
 
 export type ChatStreamEvent =
   | { type: "stage"; stage: ChatStage; message: string }
-  | { type: "tool_start"; tool: string; input: string }
-  | { type: "tool_end"; tool: string; output: string; elapsed_ms?: number }
+  | { type: "tool_start"; tool: string; input: string; run_id?: string }
+  | {
+      type: "tool_end";
+      tool: string;
+      output: string;
+      elapsed_ms?: number;
+      run_id?: string;
+    }
   | { type: "text"; content: string }
   | { type: "error"; message: string };
 

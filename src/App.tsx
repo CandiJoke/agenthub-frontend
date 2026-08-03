@@ -35,6 +35,7 @@ function timelineTitle(item: TimelineItem): string {
   if (item.kind === "stage") return item.message;
   if (item.kind === "tool") {
     if (item.status === "running") return `调用 ${item.tool}`;
+    if (item.status === "failed") return `${item.tool} 调用失败`;
     const elapsed = item.elapsedMs === undefined ? "" : ` · ${item.elapsedMs} ms`;
     return `${item.tool} 已返回${elapsed}`;
   }
@@ -92,12 +93,23 @@ export default function App() {
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(false);
-  const bottomRef = useRef<HTMLDivElement>(null);
+  const messagesPanelRef = useRef<HTMLDivElement>(null);
+  const autoScrollPinnedRef = useRef(true);
   const sessionId = useRef(`session_${Date.now()}`).current;
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+    const panel = messagesPanelRef.current;
+    if (panel && autoScrollPinnedRef.current) {
+      panel.scrollTop = panel.scrollHeight;
+    }
   }, [messages]);
+
+  const handleMessagesScroll = () => {
+    const panel = messagesPanelRef.current;
+    if (!panel) return;
+    const distanceFromBottom = panel.scrollHeight - panel.scrollTop - panel.clientHeight;
+    autoScrollPinnedRef.current = distanceFromBottom <= 48;
+  };
 
   const handleStreamEvent = (agentId: string, event: ChatStreamEvent) => {
     setMessages((currentMessages) =>
@@ -120,6 +132,7 @@ export default function App() {
     const agentId = `agent-${createdAt}`;
     const agentMessage = createPendingAgentMessage(agentId);
 
+    autoScrollPinnedRef.current = true;
     setInput("");
     setLoading(true);
     setMessages((currentMessages) => [...currentMessages, userMessage, agentMessage]);
@@ -168,7 +181,11 @@ export default function App() {
           </div>
         </header>
 
-        <div className="messages-panel">
+        <div
+          className="messages-panel"
+          ref={messagesPanelRef}
+          onScroll={handleMessagesScroll}
+        >
           {messages.length === 0 && (
             <div className="empty-state">
               <strong>输入一个问题开始</strong>
@@ -184,17 +201,29 @@ export default function App() {
                 <div className="agent-response">
                   <Timeline message={message} />
                   <div className="agent-status">
-                    <span className={message.loading ? "pulse-dot" : "steady-dot"} />
+                    <span
+                      className={
+                        message.loading
+                          ? "pulse-dot"
+                          : message.error
+                            ? "error-dot"
+                            : "steady-dot"
+                      }
+                    />
                     {message.currentStatus}
                   </div>
                   <div className="message-bubble agent-bubble">
-                    {message.content || (message.error ? `出错了：${message.error}` : "等待输出...")}
+                    {message.content || (message.error ? "未能生成回答。" : "等待输出...")}
                   </div>
+                  {message.error && (
+                    <div className="agent-error-banner" role="alert">
+                      出错了：{message.error}
+                    </div>
+                  )}
                 </div>
               )}
             </article>
           ))}
-          <div ref={bottomRef} />
         </div>
 
         <footer className="composer">
