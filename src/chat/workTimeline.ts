@@ -1,4 +1,4 @@
-import type { ChatStage, ChatStreamEvent } from "../api/chat";
+import type { ChatStage, ChatStreamEvent } from "../api/chat.js";
 
 export type TimelineStatus = "running" | "completed" | "failed";
 
@@ -216,7 +216,7 @@ function completeLatestTool(
     }
   }
 
-  if (matchIndex === -1) {
+  if (runId === undefined && matchIndex === -1) {
     for (let index = timeline.length - 1; index >= 0; index -= 1) {
       const item = timeline[index];
       if (item.kind === "tool" && item.tool === tool && item.status === "running") {

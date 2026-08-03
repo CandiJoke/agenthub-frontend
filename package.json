@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
+    "test:contracts": "tsc -p tsconfig.contract.json && node node_modules/.tmp/contracts/contracts/workTimeline.contract.js && node node_modules/.tmp/contracts/contracts/stream.contract.js",
     "preview": "vite preview"
   },
   "dependencies": {

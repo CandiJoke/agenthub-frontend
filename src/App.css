@@ -8,10 +8,10 @@
 
 .chat-surface {
   width: min(980px, 100%);
-  min-height: calc(100vh - 48px);
+  height: calc(100vh - 48px);
   margin: 0 auto;
   display: grid;
-  grid-template-rows: auto 1fr auto auto;
+  grid-template-rows: auto minmax(0, 1fr) auto auto;
   border: 1px solid #d9e1ec;
   border-radius: 8px;
   background: #ffffff;
@@ -365,7 +365,7 @@
   }
 
   .chat-surface {
-    min-height: 100vh;
+    height: 100dvh;
     border: 0;
     border-radius: 0;
   }

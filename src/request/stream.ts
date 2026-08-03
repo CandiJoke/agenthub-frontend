@@ -1,4 +1,4 @@
-import { API_BASE_URL } from "../config/env";
+import { API_BASE_URL } from "../config/env.js";
 
 export interface PostSseStreamOptions<TEvent> {
   path: string;
@@ -58,7 +58,7 @@ export function postSseStream<TEvent>({
           }
         }
       }
-      onDone();
+      throw new Error("连接提前结束");
     })
     .catch((err) => {
       if (err.name !== "AbortError") {

@@ -1,4 +1,4 @@
-import { postSseStream } from "../request/stream";
+import { postSseStream } from "../request/stream.js";
 
 export type ChatStage =
   | "received"
