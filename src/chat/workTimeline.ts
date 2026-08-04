@@ -1,6 +1,7 @@
 import type { ChatStage, ChatStreamEvent } from "../api/chat.js";
 
 export type TimelineStatus = "running" | "completed" | "failed";
+const TIMELINE_DETAIL_TEXT_LIMIT = 500;
 
 export type TimelineItem =
   | {
@@ -179,6 +180,15 @@ export function finishAgentMessage(message: AgentChatMessage): AgentChatMessage 
     currentStatus: "完成",
     loading: false,
   };
+}
+
+export function formatTimelineDetailText(
+  content: string | undefined,
+  fallback: string,
+): string {
+  if (!content) return fallback;
+  if (content.length <= TIMELINE_DETAIL_TEXT_LIMIT) return content;
+  return `${content.slice(0, TIMELINE_DETAIL_TEXT_LIMIT)}\n...内容已截断`;
 }
 
 export function summarizeAgentMessage(message: AgentChatMessage): TimelineSummary {
@@ -386,6 +396,15 @@ function buildSummaryItems(
       id: "summary-answer",
       label: "整理回答",
       status: resolveAnswerSummaryStatus(phase),
+    });
+  }
+
+  const errorItem = timeline.find((item) => item.kind === "error");
+  if (errorItem) {
+    items.push({
+      id: `summary-${errorItem.id}`,
+      label: "请求失败",
+      status: "failed",
     });
   }
 

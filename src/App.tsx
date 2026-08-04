@@ -6,6 +6,7 @@ import {
   createPendingAgentMessage,
   createUserMessage,
   finishAgentMessage,
+  formatTimelineDetailText,
   summarizeAgentMessage,
   type AgentChatMessage,
   type ChatMessage,
@@ -53,11 +54,11 @@ function TimelineDetails({ item }: { item: TimelineItem }) {
       <summary>查看工具输入和输出</summary>
       <div className="tool-detail-block">
         <span>Input</span>
-        <pre>{item.input || "无输入内容"}</pre>
+        <pre>{formatTimelineDetailText(item.input, "无输入内容")}</pre>
       </div>
       <div className="tool-detail-block">
         <span>Output</span>
-        <pre>{item.output || "等待工具返回"}</pre>
+        <pre>{formatTimelineDetailText(item.output, "等待工具返回")}</pre>
       </div>
     </details>
   );

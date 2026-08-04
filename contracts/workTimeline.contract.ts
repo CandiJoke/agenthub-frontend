@@ -4,6 +4,7 @@ import {
   appendChatStreamEvent,
   createPendingAgentMessage,
   finishAgentMessage,
+  formatTimelineDetailText,
   summarizeAgentMessage,
 } from "../src/chat/workTimeline.js";
 
@@ -174,5 +175,27 @@ assert.equal(failedSummary.phase, "failed");
 assert.equal(failedSummary.currentLabel, "请求失败");
 assert.equal(failedSummary.shouldExpandDetails, true);
 assert.equal(failedSummary.shouldCollapseDetails, false);
+
+let connectionFailureMessage = createPendingAgentMessage("connection-failure");
+connectionFailureMessage = appendChatStreamEvent(connectionFailureMessage, {
+  type: "error",
+  message: "连接失败",
+});
+const connectionFailureSummary = summarizeAgentMessage(connectionFailureMessage);
+assert.equal(connectionFailureSummary.phase, "failed");
+assert.deepEqual(
+  connectionFailureSummary.primaryItems.map(({ label, status }) => ({ label, status })),
+  [{ label: "请求失败", status: "failed" }],
+);
+assert.equal(connectionFailureSummary.detailItems.length, 1);
+assert.equal(connectionFailureSummary.shouldExpandDetails, true);
+
+const longToolText = "x".repeat(520);
+assert.equal(formatTimelineDetailText("", "无输入内容"), "无输入内容");
+assert.equal(formatTimelineDetailText(undefined, "等待工具返回"), "等待工具返回");
+assert.equal(
+  formatTimelineDetailText(longToolText, "unused"),
+  `${"x".repeat(500)}\n...内容已截断`,
+);
 
 console.log("workTimeline contracts passed");
