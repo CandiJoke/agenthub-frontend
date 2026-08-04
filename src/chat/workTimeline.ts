@@ -33,6 +33,33 @@ export type TimelineItem =
       status: "failed";
     };
 
+export type TimelinePhase =
+  | "received"
+  | "thinking"
+  | "tooling"
+  | "answering"
+  | "completed"
+  | "failed";
+
+export interface TimelineSummaryItem {
+  id: string;
+  label: string;
+  status: TimelineStatus;
+}
+
+export interface TimelineSummary {
+  currentLabel: string;
+  phase: TimelinePhase;
+  toolCount: number;
+  stageCount: number;
+  elapsedMs?: number;
+  primaryItems: TimelineSummaryItem[];
+  detailItems: TimelineItem[];
+  detailLabel: string;
+  shouldCollapseDetails: boolean;
+  shouldExpandDetails: boolean;
+}
+
 export interface UserChatMessage {
   id: string;
   role: "user";
@@ -154,6 +181,32 @@ export function finishAgentMessage(message: AgentChatMessage): AgentChatMessage 
   };
 }
 
+export function summarizeAgentMessage(message: AgentChatMessage): TimelineSummary {
+  const tools = message.timeline.filter((item) => item.kind === "tool");
+  const stages = message.timeline.filter((item) => item.kind === "stage");
+  const elapsedMs = tools.reduce<number | undefined>((total, item) => {
+    if (item.elapsedMs === undefined) return total;
+    return (total ?? 0) + item.elapsedMs;
+  }, undefined);
+  const phase = resolveSummaryPhase(message);
+  const primaryItems = buildSummaryItems(message.timeline, phase);
+  const shouldExpandDetails = phase === "failed";
+  const shouldCollapseDetails = phase === "completed";
+
+  return {
+    currentLabel: resolveSummaryLabel(message, phase),
+    phase,
+    toolCount: tools.length,
+    stageCount: stages.length,
+    elapsedMs,
+    primaryItems,
+    detailItems: message.timeline,
+    detailLabel: buildDetailLabel(stages.length, tools.length, elapsedMs),
+    shouldCollapseDetails,
+    shouldExpandDetails,
+  };
+}
+
 function appendStageEvent(
   message: AgentChatMessage,
   stage: ChatStage,
@@ -272,4 +325,91 @@ function ensureAnswerItem(timeline: TimelineItem[]): TimelineItem[] {
 
 function nextTimelineId(prefix: string, timeline: TimelineItem[]): string {
   return `${prefix}-${timeline.length + 1}`;
+}
+
+function resolveSummaryPhase(message: AgentChatMessage): TimelinePhase {
+  if (message.error) return "failed";
+  if (!message.loading) return "completed";
+  if (message.timeline.some((item) => item.kind === "answer")) return "answering";
+  if (message.timeline.some((item) => item.kind === "tool")) return "tooling";
+
+  const latestStage = [...message.timeline]
+    .reverse()
+    .find((item) => item.kind === "stage");
+  if (!latestStage || latestStage.kind !== "stage") return "received";
+  if (latestStage.stage === "received") return "received";
+  return "thinking";
+}
+
+function resolveSummaryLabel(
+  message: AgentChatMessage,
+  phase: TimelinePhase,
+): string {
+  if (phase === "failed") return "请求失败";
+  if (phase === "completed") return "回答完成";
+  if (phase === "answering") return "已拿到结果，正在整理回答";
+
+  const runningTool = [...message.timeline]
+    .reverse()
+    .find((item) => item.kind === "tool" && item.status === "running");
+  if (runningTool && runningTool.kind === "tool") return `正在使用 ${runningTool.tool}`;
+
+  if (phase === "tooling") return "工具结果已返回";
+  if (phase === "thinking") return "正在判断下一步";
+  return "已收到问题";
+}
+
+function buildSummaryItems(
+  timeline: TimelineItem[],
+  phase: TimelinePhase,
+): TimelineSummaryItem[] {
+  const items: TimelineSummaryItem[] = [];
+  if (timeline.some((item) => item.kind === "stage")) {
+    items.push({
+      id: "summary-understanding",
+      label: "理解问题",
+      status: phase === "failed" ? "failed" : "completed",
+    });
+  }
+
+  for (const item of timeline) {
+    if (item.kind !== "tool") continue;
+    items.push({
+      id: `summary-${item.id}`,
+      label: summarizeToolItem(item),
+      status: item.status,
+    });
+  }
+
+  if (timeline.some((item) => item.kind === "answer")) {
+    items.push({
+      id: "summary-answer",
+      label: "整理回答",
+      status: resolveAnswerSummaryStatus(phase),
+    });
+  }
+
+  return items;
+}
+
+function resolveAnswerSummaryStatus(phase: TimelinePhase): TimelineStatus {
+  if (phase === "failed") return "failed";
+  if (phase === "answering") return "running";
+  return "completed";
+}
+
+function summarizeToolItem(item: Extract<TimelineItem, { kind: "tool" }>): string {
+  if (item.status === "running") return `正在使用 ${item.tool}`;
+  if (item.status === "failed") return `${item.tool} 调用失败`;
+  const elapsed = item.elapsedMs === undefined ? "" : ` · ${item.elapsedMs} ms`;
+  return `${item.tool} 已返回结果${elapsed}`;
+}
+
+function buildDetailLabel(
+  stageCount: number,
+  toolCount: number,
+  elapsedMs?: number,
+): string {
+  const elapsed = elapsedMs === undefined ? "" : ` · ${elapsedMs} ms`;
+  return `查看执行详情 · ${stageCount} 个阶段 · ${toolCount} 个工具${elapsed}`;
 }
