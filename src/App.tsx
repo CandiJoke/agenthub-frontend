@@ -6,9 +6,11 @@ import {
   createPendingAgentMessage,
   createUserMessage,
   finishAgentMessage,
+  summarizeAgentMessage,
   type AgentChatMessage,
   type ChatMessage,
   type TimelineItem,
+  type TimelineSummaryItem,
 } from "./chat/workTimeline";
 import { API_BASE_URL } from "./config/env";
 
@@ -61,31 +63,71 @@ function TimelineDetails({ item }: { item: TimelineItem }) {
   );
 }
 
+function SummaryStatus({ item }: { item: TimelineSummaryItem }) {
+  return (
+    <li className={`summary-item summary-item-${item.status}`}>
+      <span className="summary-marker" />
+      <span className="summary-label">{item.label}</span>
+      <span className="summary-status">{statusLabel(item.status)}</span>
+    </li>
+  );
+}
+
+function ExecutionDetails({ item }: { item: TimelineItem }) {
+  return (
+    <li className={`detail-item detail-item-${item.status}`}>
+      <div className="detail-row">
+        <span>{timelineTitle(item)}</span>
+        <span>{statusLabel(item.status)}</span>
+      </div>
+      <TimelineDetails item={item} />
+    </li>
+  );
+}
+
 function Timeline({ message }: { message: AgentChatMessage }) {
-  if (message.timeline.length === 0) {
+  const summary = summarizeAgentMessage(message);
+  const detailOpen = summary.shouldExpandDetails && !summary.shouldCollapseDetails;
+
+  if (summary.primaryItems.length === 0) {
     return (
-      <div className="timeline-empty">
+      <div className="work-summary-empty">
         <span className="pulse-dot" />
-        {message.currentStatus}
+        {summary.currentLabel}
       </div>
     );
   }
 
   return (
-    <ol className="timeline">
-      {message.timeline.map((item) => (
-        <li className={`timeline-item timeline-item-${item.status}`} key={item.id}>
-          <div className="timeline-marker" />
-          <div className="timeline-body">
-            <div className="timeline-row">
-              <span className="timeline-title">{timelineTitle(item)}</span>
-              <span className="timeline-status">{statusLabel(item.status)}</span>
-            </div>
-            <TimelineDetails item={item} />
-          </div>
-        </li>
-      ))}
-    </ol>
+    <section className={`work-summary work-summary-${summary.phase}`}>
+      <div className="work-current">
+        <span
+          className={
+            summary.phase === "failed"
+              ? "error-dot"
+              : summary.phase === "completed"
+                ? "steady-dot"
+                : "pulse-dot"
+          }
+        />
+        <span>{summary.currentLabel}</span>
+      </div>
+      {!summary.shouldCollapseDetails && (
+        <ol className="summary-list">
+          {summary.primaryItems.map((item) => (
+            <SummaryStatus item={item} key={item.id} />
+          ))}
+        </ol>
+      )}
+      <details className="execution-details" open={detailOpen}>
+        <summary>{summary.detailLabel}</summary>
+        <ol className="detail-list">
+          {summary.detailItems.map((item) => (
+            <ExecutionDetails item={item} key={item.id} />
+          ))}
+        </ol>
+      </details>
+    </section>
   );
 }
 
@@ -200,18 +242,6 @@ export default function App() {
               ) : (
                 <div className="agent-response">
                   <Timeline message={message} />
-                  <div className="agent-status">
-                    <span
-                      className={
-                        message.loading
-                          ? "pulse-dot"
-                          : message.error
-                            ? "error-dot"
-                            : "steady-dot"
-                      }
-                    />
-                    {message.currentStatus}
-                  </div>
                   <div className="message-bubble agent-bubble">
                     {message.content || (message.error ? "未能生成回答。" : "等待输出...")}
                   </div>
