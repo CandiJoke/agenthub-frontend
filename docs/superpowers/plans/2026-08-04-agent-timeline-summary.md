@@ -100,6 +100,16 @@ assert.equal(
   true,
 );
 
+summaryMessage = appendChatStreamEvent(summaryMessage, {
+  type: "stage",
+  stage: "answering",
+  message: "Writing the answer.",
+});
+summaryMessage = appendChatStreamEvent(summaryMessage, {
+  type: "stage",
+  stage: "completed",
+  message: "Answer complete.",
+});
 summaryMessage = finishAgentMessage(summaryMessage);
 summary = summarizeAgentMessage(summaryMessage);
 assert.equal(summary.phase, "completed");
