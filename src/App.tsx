@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import "./App.css";
 import { streamChat, type ChatStreamEvent } from "./api/chat";
+import { MarkdownMessage } from "./chat/MarkdownMessage";
+import { ThinkingMessage } from "./chat/ThinkingMessage";
 import {
   appendChatStreamEvent,
   createPendingAgentMessage,
@@ -244,7 +246,13 @@ export default function App() {
                 <div className="agent-response">
                   <Timeline message={message} />
                   <div className="message-bubble agent-bubble">
-                    {message.content || (message.error ? "未能生成回答。" : "等待输出...")}
+                    {message.content ? (
+                      <MarkdownMessage content={message.content} />
+                    ) : message.loading ? (
+                      <ThinkingMessage />
+                    ) : (
+                      message.error ? "未能生成回答。" : "等待输出..."
+                    )}
                   </div>
                   {message.error && (
                     <div className="agent-error-banner" role="alert">
