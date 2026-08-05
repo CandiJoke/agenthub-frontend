@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Render Agent answers as safe, readable Markdown while preserving plain-text user messages and the existing backend stream contract.
+**Goal:** Render Agent answers as safe, readable Markdown and show a subtle Thinking state before answer content starts streaming, while preserving plain-text user messages and the existing backend stream contract.
 
-**Architecture:** Add a focused Markdown rendering unit under `src/chat/`, backed by `react-markdown` and `remark-gfm`. Keep streaming normalization as a separately tested pure helper, then wire the renderer into the Agent answer bubble and scope all Markdown styles under `.markdown-message`.
+**Architecture:** Add focused Markdown and Thinking presentation units under `src/chat/`, backed by `react-markdown` and `remark-gfm` for answer rendering. Keep streaming normalization as a separately tested pure helper, then wire the renderer and pre-answer Thinking state into the Agent answer bubble with scoped styles.
 
 **Tech Stack:** React 19, TypeScript 6, Vite 8, oxlint, Node 20.20.0 through nvm, `react-markdown`, `remark-gfm`.
 
@@ -14,11 +14,14 @@
 - Keep user messages as plain text.
 - Keep the backend stream contract unchanged.
 - Support streaming updates without waiting for the full answer.
+- Show a visible Thinking state before the first answer token arrives.
 - Support common GitHub-flavored Markdown features.
 - Add safe rendering defaults that do not allow raw HTML execution.
 - Do not use `dangerouslySetInnerHTML`.
 - Do not enable raw HTML rendering.
 - Links should be rendered with `target="_blank"` and `rel="noreferrer"`.
+- Thinking state must not expose hidden model reasoning or chain-of-thought.
+- Thinking state animation must respect `prefers-reduced-motion: reduce`.
 - No backend API changes are required.
 
 ---
@@ -27,11 +30,12 @@
 
 - Create `src/chat/markdown.ts`: pure Markdown helpers for streaming-safe display.
 - Create `src/chat/MarkdownMessage.tsx`: React Markdown renderer for Agent answers.
+- Create `src/chat/ThinkingMessage.tsx`: compact animated pre-answer waiting state.
 - Create `contracts/markdown.contract.tsx`: runtime contracts for helper behavior and rendered Markdown output.
 - Modify `tsconfig.contract.json`: allow TSX contract files.
 - Modify `package.json` and `package-lock.json`: add `react-markdown` and `remark-gfm`, and run the new contract.
-- Modify `src/App.tsx`: render Agent content through `MarkdownMessage`.
-- Modify `src/App.css`: add scoped Markdown styles and keep user bubbles as plain pre-wrapped text.
+- Modify `src/App.tsx`: render Agent content through `MarkdownMessage` and empty loading Agent content through `ThinkingMessage`.
+- Modify `src/App.css`: add scoped Markdown styles, Thinking animation styles, and keep user bubbles as plain pre-wrapped text.
 
 ---
 
@@ -40,6 +44,7 @@
 **Files:**
 - Create: `src/chat/markdown.ts`
 - Create: `src/chat/MarkdownMessage.tsx`
+- Create: `src/chat/ThinkingMessage.tsx`
 - Create: `contracts/markdown.contract.tsx`
 - Modify: `tsconfig.contract.json`
 - Modify: `package.json`
@@ -51,6 +56,8 @@
   - `function normalizeStreamingMarkdown(content: string): string`
   - `interface MarkdownMessageProps { content: string }`
   - `function MarkdownMessage({ content }: MarkdownMessageProps): JSX.Element`
+  - `interface ThinkingMessageProps { label?: string }`
+  - `function ThinkingMessage({ label }: ThinkingMessageProps): JSX.Element`
 
 - [ ] **Step 1: Install Markdown dependencies**
 
@@ -103,6 +110,7 @@ import assert from "node:assert/strict";
 import { renderToStaticMarkup } from "react-dom/server";
 
 import { MarkdownMessage } from "../src/chat/MarkdownMessage.js";
+import { ThinkingMessage } from "../src/chat/ThinkingMessage.js";
 import { normalizeStreamingMarkdown } from "../src/chat/markdown.js";
 import { createUserMessage } from "../src/chat/workTimeline.js";
 
@@ -145,6 +153,16 @@ assert.match(unsafeHtml, /<strong>safe<\/strong>/);
 const userMessage = createUserMessage("user-md", "**not rendered**");
 assert.equal(userMessage.content, "**not rendered**");
 
+const thinkingHtml = renderToStaticMarkup(<ThinkingMessage />);
+assert.match(thinkingHtml, /正在思考/);
+assert.match(thinkingHtml, /thinking-message/);
+assert.equal((thinkingHtml.match(/thinking-dot/g) ?? []).length, 3);
+
+const customThinkingHtml = renderToStaticMarkup(
+  <ThinkingMessage label="正在组织回答" />,
+);
+assert.match(customThinkingHtml, /正在组织回答/);
+
 console.log("markdown contracts passed");
 ```
 
@@ -156,7 +174,7 @@ Run:
 source ~/.nvm/nvm.sh && nvm use 20.20.0 && npm run test:contracts
 ```
 
-Expected: TypeScript fails because `src/chat/MarkdownMessage.tsx` and `src/chat/markdown.ts` do not exist.
+Expected: TypeScript fails because `src/chat/MarkdownMessage.tsx`, `src/chat/ThinkingMessage.tsx`, and `src/chat/markdown.ts` do not exist.
 
 - [ ] **Step 6: Implement streaming Markdown helper**
 
@@ -214,7 +232,30 @@ export function MarkdownMessage({ content }: MarkdownMessageProps) {
 }
 ```
 
-- [ ] **Step 8: Run contract test to verify it passes**
+- [ ] **Step 8: Implement Thinking state component**
+
+Create `src/chat/ThinkingMessage.tsx`:
+
+```tsx
+export interface ThinkingMessageProps {
+  label?: string;
+}
+
+export function ThinkingMessage({ label = "正在思考" }: ThinkingMessageProps) {
+  return (
+    <div className="thinking-message" role="status" aria-live="polite">
+      <span>{label}</span>
+      <span className="thinking-dots" aria-hidden="true">
+        <span className="thinking-dot" />
+        <span className="thinking-dot" />
+        <span className="thinking-dot" />
+      </span>
+    </div>
+  );
+}
+```
+
+- [ ] **Step 9: Run contract test to verify it passes**
 
 Run:
 
@@ -224,10 +265,10 @@ source ~/.nvm/nvm.sh && nvm use 20.20.0 && npm run test:contracts
 
 Expected: `workTimeline contracts passed`, `stream contracts passed`, and `markdown contracts passed`.
 
-- [ ] **Step 9: Commit**
+- [ ] **Step 10: Commit**
 
 ```bash
-git add package.json package-lock.json tsconfig.contract.json contracts/markdown.contract.tsx src/chat/markdown.ts src/chat/MarkdownMessage.tsx
+git add package.json package-lock.json tsconfig.contract.json contracts/markdown.contract.tsx src/chat/markdown.ts src/chat/MarkdownMessage.tsx src/chat/ThinkingMessage.tsx
 git commit -m "feat: add markdown answer renderer"
 ```
 
@@ -240,7 +281,8 @@ git commit -m "feat: add markdown answer renderer"
 
 **Interfaces:**
 - Consumes: `MarkdownMessage` from `./chat/MarkdownMessage`.
-- Produces: Agent messages render Markdown; user messages remain unchanged.
+- Consumes: `ThinkingMessage` from `./chat/ThinkingMessage`.
+- Produces: Agent messages render Markdown after content starts; loading Agent messages show Thinking state before content; user messages remain unchanged.
 
 - [ ] **Step 1: Import MarkdownMessage**
 
@@ -248,9 +290,10 @@ Add this import to `src/App.tsx`:
 
 ```tsx
 import { MarkdownMessage } from "./chat/MarkdownMessage";
+import { ThinkingMessage } from "./chat/ThinkingMessage";
 ```
 
-- [ ] **Step 2: Render Agent content through MarkdownMessage**
+- [ ] **Step 2: Render Agent content through MarkdownMessage and ThinkingMessage**
 
 Replace the current Agent bubble content:
 
@@ -263,6 +306,8 @@ with:
 ```tsx
 {message.content ? (
   <MarkdownMessage content={message.content} />
+) : message.loading ? (
+  <ThinkingMessage />
 ) : (
   message.error ? "未能生成回答。" : "等待输出..."
 )}
@@ -296,7 +341,8 @@ git commit -m "feat: render agent markdown answers"
 
 **Interfaces:**
 - Consumes: `.markdown-message` and `.markdown-table-wrap` from `MarkdownMessage`.
-- Produces: scoped Markdown styling that does not affect user bubbles or other UI.
+- Consumes: `.thinking-message`, `.thinking-dots`, and `.thinking-dot` from `ThinkingMessage`.
+- Produces: scoped Markdown styling and subtle Thinking animation that do not affect user bubbles or other UI.
 
 - [ ] **Step 1: Preserve plain-text user bubbles**
 
@@ -436,6 +482,55 @@ Add these styles after `.agent-bubble`:
 .markdown-message input[type="checkbox"] {
   margin-right: 6px;
 }
+
+.thinking-message {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 24px;
+  color: #53647d;
+}
+
+.thinking-dots {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.thinking-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: #94a3b8;
+  animation: thinking-bounce 1.1s ease-in-out infinite;
+}
+
+.thinking-dot:nth-child(2) {
+  animation-delay: 0.14s;
+}
+
+.thinking-dot:nth-child(3) {
+  animation-delay: 0.28s;
+}
+
+@keyframes thinking-bounce {
+  0%,
+  80%,
+  100% {
+    opacity: 0.45;
+    transform: translateY(0);
+  }
+  40% {
+    opacity: 1;
+    transform: translateY(-3px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .thinking-dot {
+    animation: none;
+  }
+}
 ```
 
 - [ ] **Step 3: Run lint**
@@ -498,5 +593,6 @@ Manual verification:
 - Ask for a Markdown answer with headings and lists.
 - Ask for a fenced code example.
 - Ask for a Markdown table.
+- Confirm Thinking state appears before the first answer token.
 - Confirm user messages still render as plain text.
 - Confirm mobile width does not overflow for code blocks or tables.

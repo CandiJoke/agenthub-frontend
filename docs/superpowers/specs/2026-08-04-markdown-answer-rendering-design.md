@@ -12,6 +12,7 @@ The experience should make long answers scannable: headings should create struct
 - Keep user messages as plain text.
 - Keep the backend stream contract unchanged.
 - Support streaming updates without waiting for the full answer.
+- Show a visible Thinking state before the first answer token arrives.
 - Support common GitHub-flavored Markdown features.
 - Add safe rendering defaults that do not allow raw HTML execution.
 - Style Markdown inside the existing chat bubble system.
@@ -79,12 +80,35 @@ The main `App.tsx` should stay thin:
 </div>
 ```
 
+Add a second focused component for the pre-answer waiting state:
+
+```ts
+interface ThinkingMessageProps {
+  label?: string;
+}
+```
+
+Recommended file:
+
+```text
+src/chat/ThinkingMessage.tsx
+```
+
+Responsibilities:
+
+- Show a compact animated waiting state inside the Agent answer bubble.
+- Use neutral copy such as `正在思考`.
+- Avoid exposing hidden model reasoning or chain-of-thought.
+- Disappear immediately when the first answer content is available.
+
 ## Streaming Behavior
 
 The Agent response arrives token by token. The renderer should work with partial Markdown.
 
 For the first version:
 
+- Show `ThinkingMessage` while the Agent response is loading and `message.content` is empty.
+- Replace `ThinkingMessage` with `MarkdownMessage` as soon as the first `text` event appends content.
 - Render content on every stream update.
 - Preserve partial paragraphs and partial lists.
 - If the content contains an unmatched fenced code block marker, append a temporary closing fence only for rendering.
@@ -107,6 +131,9 @@ Markdown styling should be scoped under a parent class such as `.markdown-messag
 
 Required styling:
 
+- Thinking state uses subtle motion, such as three bouncing dots or a small shimmer.
+- Thinking motion should feel lightweight and should not shift layout.
+- Respect `prefers-reduced-motion: reduce` by disabling or minimizing animation.
 - Paragraphs use comfortable vertical spacing but do not create excessive gaps in chat bubbles.
 - Headings are smaller than page headings and fit the message bubble.
 - Lists have visible indentation and consistent spacing.
@@ -133,6 +160,8 @@ The displayed Markdown should not execute scripts or render raw HTML. External l
 
 If Markdown rendering receives an empty string, the caller should keep showing the existing fallback text.
 
+If the Agent is still loading and no answer text has arrived, the caller should show `ThinkingMessage` instead of the fallback text.
+
 If Markdown content is malformed, the renderer should still show the best-effort text. It should not crash the chat view. The streaming fence normalization exists specifically to avoid broken code block presentation during partial output.
 
 ## Testing
@@ -142,6 +171,7 @@ Add contract coverage for Markdown helpers:
 - Plain text returns unchanged.
 - Balanced fenced code blocks return unchanged.
 - Unmatched fenced code blocks get a temporary closing fence.
+- Thinking state renders neutral waiting copy and animated dot elements.
 - User message creation remains plain text and does not use Markdown rendering.
 
 Run existing frontend checks:
@@ -157,12 +187,14 @@ Manual verification:
 - Ask for a Markdown answer with headings and lists.
 - Ask for a code example with a fenced code block.
 - Ask for a table.
+- Confirm Thinking state appears before the first answer token.
 - Confirm user messages still render as plain text.
 - Confirm mobile width does not overflow for code blocks or tables.
 
 ## Acceptance Criteria
 
 - Agent answers render Markdown instead of plain pre-wrapped text.
+- A Thinking state appears before answer content starts streaming.
 - User messages remain plain text.
 - Code blocks and tables are readable and do not break layout.
 - Streaming partial Markdown does not crash or produce a visibly broken answer bubble.
