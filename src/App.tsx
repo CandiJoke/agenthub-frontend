@@ -40,6 +40,23 @@ function updateAgentMessage(
   });
 }
 
+function findPromptBeforeAgent(
+  messages: ChatMessage[],
+  agentId: string,
+): string | undefined {
+  const agentIndex = messages.findIndex(
+    (message) => message.role === "agent" && message.id === agentId,
+  );
+  if (agentIndex === -1) return undefined;
+
+  for (let index = agentIndex - 1; index >= 0; index -= 1) {
+    const message = messages[index];
+    if (message.role === "user") return message.content;
+  }
+
+  return undefined;
+}
+
 export default function App() {
   const [userId] = useState(() => getOrCreateUserId());
   const [input, setInput] = useState("");
@@ -57,6 +74,8 @@ export default function App() {
   const autoScrollPinnedRef = useRef(true);
   const historyRequestIdRef = useRef(0);
   const runTraceRequestIdRef = useRef(0);
+  const activeStreamRef = useRef<AbortController | undefined>(undefined);
+  const activeAgentIdRef = useRef<string | undefined>(undefined);
 
   const loadSessionMessages = useCallback(async (
     sessionId: string,
@@ -109,6 +128,10 @@ export default function App() {
   useEffect(() => {
     void loadSessions();
   }, [loadSessions]);
+
+  useEffect(() => () => {
+    activeStreamRef.current?.abort();
+  }, []);
 
   useEffect(() => {
     const panel = messagesPanelRef.current;
@@ -237,14 +260,17 @@ export default function App() {
       ),
     );
 
-    if (event.type === "error") {
+    if (event.type === "error" || event.type === "stopped") {
+      if (activeAgentIdRef.current === agentId) {
+        activeStreamRef.current = undefined;
+        activeAgentIdRef.current = undefined;
+      }
       setLoading(false);
     }
   };
 
-  const handleSend = () => {
-    const text = input.trim();
-    if (!text || loading || !activeSessionId) return;
+  const startChatRun = (text: string): boolean => {
+    if (!text || loading || !activeSessionId) return false;
 
     const createdAt = Date.now();
     const userMessage = createUserMessage(`user-${createdAt}`, text);
@@ -252,16 +278,19 @@ export default function App() {
     const agentMessage = createPendingAgentMessage(agentId);
 
     autoScrollPinnedRef.current = true;
-    setInput("");
     setLoading(true);
     setMessages((currentMessages) => [...currentMessages, userMessage, agentMessage]);
 
-    streamChat({
+    const controller = streamChat({
       userId,
       sessionId: activeSessionId,
       message: text,
       onEvent: (event) => handleStreamEvent(agentId, event),
       onDone: () => {
+        if (activeAgentIdRef.current === agentId) {
+          activeStreamRef.current = undefined;
+          activeAgentIdRef.current = undefined;
+        }
         setLoading(false);
         setMessages((currentMessages) =>
           updateAgentMessage(currentMessages, agentId, finishAgentMessage),
@@ -269,6 +298,10 @@ export default function App() {
         void listSessions(userId).then(setSessions).catch(() => undefined);
       },
       onError: (errorMessage) => {
+        if (activeAgentIdRef.current === agentId) {
+          activeStreamRef.current = undefined;
+          activeAgentIdRef.current = undefined;
+        }
         setLoading(false);
         setMessages((currentMessages) =>
           updateAgentMessage(currentMessages, agentId, (agent) =>
@@ -280,6 +313,41 @@ export default function App() {
         );
       },
     });
+
+    activeStreamRef.current = controller;
+    activeAgentIdRef.current = agentId;
+    return true;
+  };
+
+  const handleSend = () => {
+    const text = input.trim();
+    if (startChatRun(text)) {
+      setInput("");
+    }
+  };
+
+  const handleStopAgent = (agentId: string) => {
+    if (activeAgentIdRef.current !== agentId) return;
+
+    activeStreamRef.current?.abort();
+    activeStreamRef.current = undefined;
+    activeAgentIdRef.current = undefined;
+    setLoading(false);
+    setMessages((currentMessages) =>
+      updateAgentMessage(currentMessages, agentId, (agent) =>
+        appendChatStreamEvent(agent, {
+          type: "stopped",
+          message: "已停止本次回答",
+        }),
+      ),
+    );
+    void listSessions(userId).then(setSessions).catch(() => undefined);
+  };
+
+  const handleReplayAgent = (agentId: string) => {
+    const prompt = findPromptBeforeAgent(messages, agentId);
+    if (!prompt) return;
+    startChatRun(prompt);
   };
 
   const handleOpenRunTrace = async (runId: string) => {
@@ -355,43 +423,85 @@ export default function App() {
             </div>
           )}
 
-          {messages.map((message) => (
-            <article className={`message message-${message.role}`} key={message.id}>
-              {message.role === "user" ? (
-                <div className="message-bubble user-bubble">{message.content}</div>
-              ) : (
-                <div className="agent-response">
-                  <Timeline message={message} />
-                  <div className="message-bubble agent-bubble">
-                    {message.content ? (
-                      <MarkdownMessage content={message.content} />
-                    ) : message.loading ? (
-                      <ThinkingMessage />
-                    ) : (
-                      message.error ? "未能生成回答。" : "等待输出..."
+          {messages.map((message) => {
+            const replayPrompt = message.role === "agent"
+              ? findPromptBeforeAgent(messages, message.id)
+              : undefined;
+            const canReplay = Boolean(replayPrompt && !loading && activeSessionId);
+
+            return (
+              <article className={`message message-${message.role}`} key={message.id}>
+                {message.role === "user" ? (
+                  <div className="message-bubble user-bubble">{message.content}</div>
+                ) : (
+                  <div className="agent-response">
+                    <Timeline message={message} />
+                    <div className="message-bubble agent-bubble">
+                      {message.content ? (
+                        <MarkdownMessage content={message.content} />
+                      ) : message.loading ? (
+                        <ThinkingMessage />
+                      ) : (
+                        message.stopped
+                          ? "已停止输出。"
+                          : message.error
+                            ? "未能生成回答。"
+                            : "等待输出..."
+                      )}
+                    </div>
+                    <div className="agent-actions" aria-label="回答操作">
+                      {message.runId && (
+                        <button
+                          className="agent-action-button run-detail-button"
+                          type="button"
+                          onClick={() => {
+                            const runId = message.runId;
+                            if (runId) void handleOpenRunTrace(runId);
+                          }}
+                        >
+                          查看执行详情
+                        </button>
+                      )}
+                      {message.loading && activeAgentIdRef.current === message.id && message.runId && (
+                        <button
+                          className="agent-action-button agent-action-stop"
+                          type="button"
+                          onClick={() => handleStopAgent(message.id)}
+                        >
+                          停止
+                        </button>
+                      )}
+                      {!message.loading && (message.error || message.stopped) && (
+                        <button
+                          className="agent-action-button"
+                          type="button"
+                          disabled={!canReplay}
+                          onClick={() => handleReplayAgent(message.id)}
+                        >
+                          重试
+                        </button>
+                      )}
+                      {!message.loading && !message.error && !message.stopped && message.content && (
+                        <button
+                          className="agent-action-button"
+                          type="button"
+                          disabled={!canReplay}
+                          onClick={() => handleReplayAgent(message.id)}
+                        >
+                          重新生成
+                        </button>
+                      )}
+                    </div>
+                    {message.error && (
+                      <div className="agent-error-banner" role="alert">
+                        出错了：{message.error}
+                      </div>
                     )}
                   </div>
-                  {message.runId && (
-                    <button
-                      className="run-detail-button"
-                      type="button"
-                      onClick={() => {
-                        const runId = message.runId;
-                        if (runId) void handleOpenRunTrace(runId);
-                      }}
-                    >
-                      查看执行详情
-                    </button>
-                  )}
-                  {message.error && (
-                    <div className="agent-error-banner" role="alert">
-                      出错了：{message.error}
-                    </div>
-                  )}
-                </div>
-              )}
-            </article>
-          ))}
+                )}
+              </article>
+            );
+          })}
         </div>
 
         <footer className="composer">

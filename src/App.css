@@ -102,6 +102,7 @@
 .session-sidebar-header button:hover,
 .session-error button:hover,
 .run-trace-header button:hover,
+.agent-action-button:hover,
 .run-detail-button:hover {
   border-color: #9eb1c9;
   background: #eef2f7;
@@ -109,6 +110,7 @@
 
 .session-sidebar-header button:disabled,
 .session-error button:disabled,
+.agent-action-button:disabled,
 .session-row:disabled {
   cursor: not-allowed;
   opacity: 0.58;
@@ -458,6 +460,10 @@
   color: #991b1b;
 }
 
+.work-summary-stopped .work-current {
+  color: #92400e;
+}
+
 .summary-list {
   display: grid;
   gap: 6px;
@@ -495,6 +501,10 @@
 
 .summary-item-failed .summary-marker {
   background: #dc2626;
+}
+
+.summary-item-stopped .summary-marker {
+  background: #f59e0b;
 }
 
 .summary-label {
@@ -594,7 +604,8 @@
 
 .pulse-dot,
 .steady-dot,
-.error-dot {
+.error-dot,
+.stopped-dot {
   width: 8px;
   height: 8px;
   flex: 0 0 auto;
@@ -614,6 +625,10 @@
   background: #dc2626;
 }
 
+.stopped-dot {
+  background: #f59e0b;
+}
+
 .agent-error-banner {
   max-width: min(720px, 86%);
   border: 1px solid #fecaca;
@@ -626,6 +641,13 @@
   overflow-wrap: anywhere;
 }
 
+.agent-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.agent-action-button,
 .run-detail-button {
   justify-self: start;
   border: 1px solid #cdd8e6;
@@ -636,6 +658,17 @@
   font: inherit;
   font-size: 12px;
   cursor: pointer;
+}
+
+.agent-action-stop {
+  border-color: #fecaca;
+  color: #991b1b;
+  background: #fff7f7;
+}
+
+.agent-action-stop:hover {
+  border-color: #fca5a5;
+  background: #fef2f2;
 }
 
 .run-trace-panel {
@@ -694,6 +727,10 @@
 
 .run-status-failed span:first-child {
   color: #b91c1c;
+}
+
+.run-status-stopped span:first-child {
+  color: #92400e;
 }
 
 .composer {

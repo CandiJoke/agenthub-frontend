@@ -26,6 +26,7 @@ export type ChatStreamEvent =
       run_id?: string;
     } & ChatStreamEventBase)
   | ({ type: "text"; content: string } & ChatStreamEventBase)
+  | ({ type: "stopped"; message: string } & ChatStreamEventBase)
   | ({ type: "error"; message: string } & ChatStreamEventBase);
 
 export interface StreamChatOptions {

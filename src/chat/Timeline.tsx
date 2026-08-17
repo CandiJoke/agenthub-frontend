@@ -9,6 +9,7 @@ import {
 function statusLabel(status: TimelineItem["status"]): string {
   if (status === "running") return "进行中";
   if (status === "failed") return "失败";
+  if (status === "stopped") return "已停止";
   return "完成";
 }
 
@@ -17,6 +18,7 @@ function timelineTitle(item: TimelineItem): string {
   if (item.kind === "tool") {
     if (item.status === "running") return `调用 ${item.tool}`;
     if (item.status === "failed") return `${item.tool} 调用失败`;
+    if (item.status === "stopped") return `${item.tool} 已停止`;
     const elapsed = item.elapsedMs === undefined ? "" : ` · ${item.elapsedMs} ms`;
     return `${item.tool} 已返回${elapsed}`;
   }
@@ -86,7 +88,9 @@ export function Timeline({ message }: { message: AgentChatMessage }) {
               ? "error-dot"
               : summary.phase === "completed"
                 ? "steady-dot"
-                : "pulse-dot"
+                : summary.phase === "stopped"
+                  ? "stopped-dot"
+                  : "pulse-dot"
           }
         />
         <span>{summary.currentLabel}</span>

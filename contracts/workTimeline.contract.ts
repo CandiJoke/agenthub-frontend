@@ -176,6 +176,37 @@ assert.equal(failedSummary.currentLabel, "请求失败");
 assert.equal(failedSummary.shouldExpandDetails, true);
 assert.equal(failedSummary.shouldCollapseDetails, false);
 
+let stoppedSummaryMessage = createPendingAgentMessage("summary-stopped");
+stoppedSummaryMessage = appendChatStreamEvent(stoppedSummaryMessage, {
+  type: "stage",
+  stage: "planning",
+  message: "正在判断下一步",
+});
+stoppedSummaryMessage = appendChatStreamEvent(stoppedSummaryMessage, {
+  type: "tool_start",
+  tool: "search",
+  input: "LangChain",
+  run_id: "search-run",
+});
+stoppedSummaryMessage = appendChatStreamEvent(stoppedSummaryMessage, {
+  type: "stopped",
+  message: "已停止本次回答",
+});
+const stoppedSummary = summarizeAgentMessage(stoppedSummaryMessage);
+assert.equal(stoppedSummaryMessage.loading, false);
+assert.equal(stoppedSummaryMessage.stopped, true);
+assert.equal(stoppedSummary.phase, "stopped");
+assert.equal(stoppedSummary.currentLabel, "已停止");
+assert.equal(stoppedSummary.shouldExpandDetails, true);
+assert.deepEqual(
+  stoppedSummary.primaryItems.map(({ label, status }) => ({ label, status })),
+  [
+    { label: "理解问题", status: "stopped" },
+    { label: "search 已停止", status: "stopped" },
+    { label: "已停止", status: "stopped" },
+  ],
+);
+
 let connectionFailureMessage = createPendingAgentMessage("connection-failure");
 connectionFailureMessage = appendChatStreamEvent(connectionFailureMessage, {
   type: "error",

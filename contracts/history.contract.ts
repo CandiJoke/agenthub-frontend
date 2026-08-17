@@ -114,6 +114,30 @@ assert.equal(mapped[1].content, "hi");
 assert.equal(mapped[1].runId, "run-a");
 assert.equal(mapped[1].loading, false);
 
+const stoppedMapped = mapPersistedMessages([
+  {
+    messageId: "message-user",
+    sessionId: "session-a",
+    role: "user",
+    content: "hello",
+    createdAt: "2026-08-17T00:00:00Z",
+  },
+  {
+    messageId: "message-stopped",
+    sessionId: "session-a",
+    role: "agent",
+    content: "已停止输出。",
+    runId: "run-stopped",
+    runStatus: "stopped",
+    createdAt: "2026-08-17T00:00:01Z",
+  },
+]);
+assert.equal(stoppedMapped[1].role, "agent");
+assert.equal(stoppedMapped[1].content, "已停止输出。");
+assert.equal(stoppedMapped[1].runId, "run-stopped");
+assert.equal(stoppedMapped[1].loading, false);
+assert.equal(stoppedMapped[1].stopped, true);
+
 const replayed = replayRunEvents("run-a", [
   {
     eventId: "event-1",
@@ -142,6 +166,40 @@ assert.equal(replayed.runId, "run-a");
 assert.equal(replayed.content, "hi");
 assert.equal(replayed.timeline.some((item) => item.kind === "answer"), true);
 assert.equal(replayed.loading, false);
+
+const stoppedReplay = replayRunEvents("run-stopped", [
+  {
+    eventId: "event-1",
+    runId: "run-stopped",
+    sequence: 1,
+    eventType: "stage",
+    payload: {
+      type: "stage",
+      stage: "planning",
+      message: "正在判断下一步",
+      runId: "run-stopped",
+    },
+    createdAt: "2026-08-17T00:00:00Z",
+  },
+  {
+    eventId: "event-2",
+    runId: "run-stopped",
+    sequence: 2,
+    eventType: "stopped",
+    payload: {
+      type: "stopped",
+      message: "用户已停止本次运行。",
+      runId: "run-stopped",
+    },
+    createdAt: "2026-08-17T00:00:01Z",
+  },
+]);
+assert.equal(stoppedReplay.loading, false);
+assert.equal(stoppedReplay.stopped, true);
+
+const stoppedReplayWithoutEvent = replayRunEvents("run-stopped-empty", [], "stopped");
+assert.equal(stoppedReplayWithoutEvent.loading, false);
+assert.equal(stoppedReplayWithoutEvent.stopped, true);
 
 const sidebarHtml = renderToStaticMarkup(
   createElement(SessionSidebar, {
@@ -219,5 +277,66 @@ const runTraceHtml = renderToStaticMarkup(
 assert.match(runTraceHtml, /执行详情/);
 assert.match(runTraceHtml, /completed/);
 assert.match(runTraceHtml, /回答完成/);
+
+const stoppedRunTraceHtml = renderToStaticMarkup(
+  createElement(RunTracePanel, {
+    trace: {
+      run: {
+        runId: "run-stopped",
+        sessionId: "session-a",
+        userMessageId: "message-user",
+        agentMessageId: null,
+        status: "stopped",
+        prompt: "hello",
+        model: "model-a",
+        startedAt: "2026-08-17T00:00:00Z",
+        endedAt: "2026-08-17T00:00:02Z",
+        errorMessage: "用户已停止本次运行。",
+      },
+      events: [
+        {
+          eventId: "event-1",
+          runId: "run-stopped",
+          sequence: 1,
+          eventType: "stopped",
+          payload: {
+            type: "stopped",
+            message: "用户已停止本次运行。",
+            runId: "run-stopped",
+          },
+          createdAt: "2026-08-17T00:00:01Z",
+        },
+      ],
+    },
+    loading: false,
+    onClose: () => undefined,
+  }),
+);
+assert.match(stoppedRunTraceHtml, /stopped/);
+assert.match(stoppedRunTraceHtml, /已停止/);
+
+const stoppedRunTraceWithoutEventsHtml = renderToStaticMarkup(
+  createElement(RunTracePanel, {
+    trace: {
+      run: {
+        runId: "run-stopped-empty",
+        sessionId: "session-a",
+        userMessageId: "message-user",
+        agentMessageId: "message-agent",
+        status: "stopped",
+        prompt: "hello",
+        model: "model-a",
+        startedAt: "2026-08-17T00:00:00Z",
+        endedAt: "2026-08-17T00:00:02Z",
+        errorMessage: "用户已停止本次运行。",
+      },
+      events: [],
+    },
+    loading: false,
+    onClose: () => undefined,
+  }),
+);
+assert.match(stoppedRunTraceWithoutEventsHtml, /stopped/);
+assert.match(stoppedRunTraceWithoutEventsHtml, /已停止/);
 
 console.log("history contracts passed");

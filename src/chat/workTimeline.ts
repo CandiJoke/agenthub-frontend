@@ -1,6 +1,6 @@
 import type { ChatStage, ChatStreamEvent } from "../api/chat.js";
 
-export type TimelineStatus = "running" | "completed" | "failed";
+export type TimelineStatus = "running" | "completed" | "failed" | "stopped";
 const TIMELINE_DETAIL_TEXT_LIMIT = 500;
 
 export type TimelineItem =
@@ -32,6 +32,12 @@ export type TimelineItem =
       kind: "error";
       message: string;
       status: "failed";
+    }
+  | {
+      id: string;
+      kind: "stopped";
+      message: string;
+      status: "stopped";
     };
 
 export type TimelinePhase =
@@ -40,7 +46,8 @@ export type TimelinePhase =
   | "tooling"
   | "answering"
   | "completed"
-  | "failed";
+  | "failed"
+  | "stopped";
 
 export interface TimelineSummaryItem {
   id: string;
@@ -76,6 +83,7 @@ export interface AgentChatMessage {
   loading: boolean;
   runId?: string;
   error?: string;
+  stopped?: boolean;
 }
 
 export type ChatMessage = UserChatMessage | AgentChatMessage;
@@ -154,6 +162,25 @@ export function appendChatStreamEvent(
     };
   }
 
+  if (event.type === "stopped") {
+    const timeline = completeRunningItems(nextMessage.timeline, "stopped");
+    return {
+      ...nextMessage,
+      timeline: [
+        ...timeline,
+        {
+          id: nextTimelineId("stopped", timeline),
+          kind: "stopped",
+          message: event.message,
+          status: "stopped",
+        },
+      ],
+      currentStatus: "已停止",
+      loading: false,
+      stopped: true,
+    };
+  }
+
   return {
     ...nextMessage,
     timeline: [
@@ -172,7 +199,7 @@ export function appendChatStreamEvent(
 }
 
 export function finishAgentMessage(message: AgentChatMessage): AgentChatMessage {
-  if (message.error) {
+  if (message.error || message.stopped) {
     return {
       ...message,
       loading: false,
@@ -205,7 +232,7 @@ export function summarizeAgentMessage(message: AgentChatMessage): TimelineSummar
   }, undefined);
   const phase = resolveSummaryPhase(message);
   const primaryItems = buildSummaryItems(message.timeline, phase);
-  const shouldExpandDetails = phase === "failed";
+  const shouldExpandDetails = phase === "failed" || phase === "stopped";
   const shouldCollapseDetails = phase === "completed";
 
   return {
@@ -344,6 +371,7 @@ function nextTimelineId(prefix: string, timeline: TimelineItem[]): string {
 
 function resolveSummaryPhase(message: AgentChatMessage): TimelinePhase {
   if (message.error) return "failed";
+  if (message.stopped) return "stopped";
   if (!message.loading) return "completed";
   if (message.timeline.some((item) => item.kind === "answer")) return "answering";
   if (message.timeline.some((item) => item.kind === "tool")) return "tooling";
@@ -361,6 +389,7 @@ function resolveSummaryLabel(
   phase: TimelinePhase,
 ): string {
   if (phase === "failed") return "请求失败";
+  if (phase === "stopped") return "已停止";
   if (phase === "completed") return "回答完成";
   if (phase === "answering") return "已拿到结果，正在整理回答";
 
@@ -383,7 +412,7 @@ function buildSummaryItems(
     items.push({
       id: "summary-understanding",
       label: "理解问题",
-      status: phase === "failed" ? "failed" : "completed",
+      status: resolveFoundationalSummaryStatus(phase),
     });
   }
 
@@ -413,11 +442,27 @@ function buildSummaryItems(
     });
   }
 
+  const stoppedItem = timeline.find((item) => item.kind === "stopped");
+  if (stoppedItem) {
+    items.push({
+      id: `summary-${stoppedItem.id}`,
+      label: "已停止",
+      status: "stopped",
+    });
+  }
+
   return items;
+}
+
+function resolveFoundationalSummaryStatus(phase: TimelinePhase): TimelineStatus {
+  if (phase === "failed") return "failed";
+  if (phase === "stopped") return "stopped";
+  return "completed";
 }
 
 function resolveAnswerSummaryStatus(phase: TimelinePhase): TimelineStatus {
   if (phase === "failed") return "failed";
+  if (phase === "stopped") return "stopped";
   if (phase === "answering") return "running";
   return "completed";
 }
@@ -425,6 +470,7 @@ function resolveAnswerSummaryStatus(phase: TimelinePhase): TimelineStatus {
 function summarizeToolItem(item: Extract<TimelineItem, { kind: "tool" }>): string {
   if (item.status === "running") return `正在使用 ${item.tool}`;
   if (item.status === "failed") return `${item.tool} 调用失败`;
+  if (item.status === "stopped") return `${item.tool} 已停止`;
   const elapsed = item.elapsedMs === undefined ? "" : ` · ${item.elapsedMs} ms`;
   return `${item.tool} 已返回结果${elapsed}`;
 }

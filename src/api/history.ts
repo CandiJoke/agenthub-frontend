@@ -13,6 +13,7 @@ export interface PersistedChatMessageDto {
   role: "user" | "agent";
   content: string;
   runId?: string;
+  runStatus?: "running" | "completed" | "failed" | "stopped";
   createdAt: string;
 }
 
@@ -21,7 +22,7 @@ export interface AgentRunDto {
   sessionId: string;
   userMessageId: string;
   agentMessageId: string | null;
-  status: "running" | "completed" | "failed";
+  status: "running" | "completed" | "failed" | "stopped";
   prompt: string;
   model: string;
   startedAt: string;

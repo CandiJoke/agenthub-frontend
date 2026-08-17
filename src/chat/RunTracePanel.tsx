@@ -15,7 +15,9 @@ export function RunTracePanel({
   error,
   onClose,
 }: RunTracePanelProps) {
-  const replayed = trace ? replayRunEvents(trace.run.runId, trace.events) : undefined;
+  const replayed = trace
+    ? replayRunEvents(trace.run.runId, trace.events, trace.run.status)
+    : undefined;
 
   return (
     <aside className="run-trace-panel" aria-label="执行详情">
