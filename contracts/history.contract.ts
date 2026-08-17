@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 
 import { createSessionRequest, toStreamChatBody } from "../src/api/history.js";
+import { RunTracePanel } from "../src/chat/RunTracePanel.js";
+import { SessionSidebar } from "../src/chat/SessionSidebar.js";
 import {
   mapPersistedMessages,
   replayRunEvents,
@@ -97,5 +101,73 @@ assert.equal(replayed.runId, "run-a");
 assert.equal(replayed.content, "hi");
 assert.equal(replayed.timeline.some((item) => item.kind === "answer"), true);
 assert.equal(replayed.loading, false);
+
+const sidebarHtml = renderToStaticMarkup(
+  createElement(SessionSidebar, {
+    sessions: [
+      {
+        sessionId: "session-a",
+        title: "第一段聊天",
+        createdAt: "2026-08-17T00:00:00Z",
+        updatedAt: "2026-08-17T00:01:00Z",
+      },
+    ],
+    activeSessionId: "session-a",
+    loading: false,
+    onCreateSession: () => undefined,
+    onSelectSession: () => undefined,
+    onRetry: () => undefined,
+  }),
+);
+assert.match(sidebarHtml, /聊天记录/);
+assert.match(sidebarHtml, /新建/);
+assert.match(sidebarHtml, /session-row-active/);
+
+const runTraceHtml = renderToStaticMarkup(
+  createElement(RunTracePanel, {
+    trace: {
+      run: {
+        runId: "run-a",
+        sessionId: "session-a",
+        userMessageId: "message-user",
+        agentMessageId: "message-agent",
+        status: "completed",
+        prompt: "hello",
+        model: "model-a",
+        startedAt: "2026-08-17T00:00:00Z",
+        endedAt: "2026-08-17T00:00:02Z",
+        errorMessage: null,
+      },
+      events: [
+        {
+          eventId: "event-1",
+          runId: "run-a",
+          sequence: 1,
+          eventType: "stage",
+          payload: {
+            type: "stage",
+            stage: "received",
+            message: "已收到问题",
+            runId: "run-a",
+          },
+          createdAt: "2026-08-17T00:00:00Z",
+        },
+        {
+          eventId: "event-2",
+          runId: "run-a",
+          sequence: 2,
+          eventType: "text",
+          payload: { type: "text", content: "hi", runId: "run-a" },
+          createdAt: "2026-08-17T00:00:01Z",
+        },
+      ],
+    },
+    loading: false,
+    onClose: () => undefined,
+  }),
+);
+assert.match(runTraceHtml, /执行详情/);
+assert.match(runTraceHtml, /completed/);
+assert.match(runTraceHtml, /回答完成/);
 
 console.log("history contracts passed");

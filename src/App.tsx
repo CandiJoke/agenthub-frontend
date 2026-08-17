@@ -1,21 +1,30 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import "./App.css";
 import { streamChat, type ChatStreamEvent } from "./api/chat";
+import {
+  createSession,
+  getRunDetail,
+  listMessages,
+  listSessions,
+  type ChatSessionDto,
+  type RunTraceDto,
+} from "./api/history";
 import { MarkdownMessage } from "./chat/MarkdownMessage";
+import { RunTracePanel } from "./chat/RunTracePanel";
+import { SessionSidebar } from "./chat/SessionSidebar";
 import { ThinkingMessage } from "./chat/ThinkingMessage";
+import { Timeline } from "./chat/Timeline";
+import { mapPersistedMessages } from "./chat/historyMapping";
 import {
   appendChatStreamEvent,
   createPendingAgentMessage,
   createUserMessage,
   finishAgentMessage,
-  formatTimelineDetailText,
-  summarizeAgentMessage,
   type AgentChatMessage,
   type ChatMessage,
-  type TimelineItem,
-  type TimelineSummaryItem,
 } from "./chat/workTimeline";
 import { API_BASE_URL } from "./config/env";
+import { getOrCreateUserId } from "./session/userIdentity";
 
 function updateAgentMessage(
   messages: ChatMessage[],
@@ -30,117 +39,55 @@ function updateAgentMessage(
   });
 }
 
-function statusLabel(status: TimelineItem["status"]): string {
-  if (status === "running") return "进行中";
-  if (status === "failed") return "失败";
-  return "完成";
-}
-
-function timelineTitle(item: TimelineItem): string {
-  if (item.kind === "stage") return item.message;
-  if (item.kind === "tool") {
-    if (item.status === "running") return `调用 ${item.tool}`;
-    if (item.status === "failed") return `${item.tool} 调用失败`;
-    const elapsed = item.elapsedMs === undefined ? "" : ` · ${item.elapsedMs} ms`;
-    return `${item.tool} 已返回${elapsed}`;
-  }
-  if (item.kind === "answer") return item.message;
-  return item.message;
-}
-
-function TimelineDetails({ item }: { item: TimelineItem }) {
-  if (item.kind !== "tool") return null;
-
-  return (
-    <details className="timeline-details">
-      <summary>查看工具输入和输出</summary>
-      <div className="tool-detail-block">
-        <span>Input</span>
-        <pre>{formatTimelineDetailText(item.input, "无输入内容")}</pre>
-      </div>
-      <div className="tool-detail-block">
-        <span>Output</span>
-        <pre>{formatTimelineDetailText(item.output, "等待工具返回")}</pre>
-      </div>
-    </details>
-  );
-}
-
-function SummaryStatus({ item }: { item: TimelineSummaryItem }) {
-  return (
-    <li className={`summary-item summary-item-${item.status}`}>
-      <span className="summary-marker" />
-      <span className="summary-label">{item.label}</span>
-      <span className="summary-status">{statusLabel(item.status)}</span>
-    </li>
-  );
-}
-
-function ExecutionDetails({ item }: { item: TimelineItem }) {
-  return (
-    <li className={`detail-item detail-item-${item.status}`}>
-      <div className="detail-row">
-        <span>{timelineTitle(item)}</span>
-        <span>{statusLabel(item.status)}</span>
-      </div>
-      <TimelineDetails item={item} />
-    </li>
-  );
-}
-
-function Timeline({ message }: { message: AgentChatMessage }) {
-  const summary = summarizeAgentMessage(message);
-  const detailOpen = summary.shouldExpandDetails && !summary.shouldCollapseDetails;
-
-  if (summary.primaryItems.length === 0) {
-    return (
-      <div className="work-summary-empty">
-        <span className="pulse-dot" />
-        {summary.currentLabel}
-      </div>
-    );
-  }
-
-  return (
-    <section className={`work-summary work-summary-${summary.phase}`}>
-      <div className="work-current">
-        <span
-          className={
-            summary.phase === "failed"
-              ? "error-dot"
-              : summary.phase === "completed"
-                ? "steady-dot"
-                : "pulse-dot"
-          }
-        />
-        <span>{summary.currentLabel}</span>
-      </div>
-      {!summary.shouldCollapseDetails && (
-        <ol className="summary-list">
-          {summary.primaryItems.map((item) => (
-            <SummaryStatus item={item} key={item.id} />
-          ))}
-        </ol>
-      )}
-      <details className="execution-details" open={detailOpen}>
-        <summary>{summary.detailLabel}</summary>
-        <ol className="detail-list">
-          {summary.detailItems.map((item) => (
-            <ExecutionDetails item={item} key={item.id} />
-          ))}
-        </ol>
-      </details>
-    </section>
-  );
-}
-
 export default function App() {
+  const [userId] = useState(() => getOrCreateUserId());
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [sessions, setSessions] = useState<ChatSessionDto[]>([]);
+  const [activeSessionId, setActiveSessionId] = useState<string>();
   const [loading, setLoading] = useState(false);
+  const [historyLoading, setHistoryLoading] = useState(true);
+  const [historyError, setHistoryError] = useState<string>();
+  const [runTrace, setRunTrace] = useState<RunTraceDto>();
+  const [runTraceLoading, setRunTraceLoading] = useState(false);
+  const [runTraceError, setRunTraceError] = useState<string>();
   const messagesPanelRef = useRef<HTMLDivElement>(null);
   const autoScrollPinnedRef = useRef(true);
-  const sessionId = useRef(`session_${Date.now()}`).current;
+
+  const loadSessionMessages = useCallback(async (sessionId: string) => {
+    const persistedMessages = await listMessages(userId, sessionId);
+    autoScrollPinnedRef.current = true;
+    setRunTrace(undefined);
+    setRunTraceError(undefined);
+    setMessages(mapPersistedMessages(persistedMessages));
+    setActiveSessionId(sessionId);
+  }, [userId]);
+
+  const loadSessions = useCallback(async () => {
+    setHistoryLoading(true);
+    setHistoryError(undefined);
+    try {
+      const loadedSessions = await listSessions(userId);
+      if (loadedSessions.length === 0) {
+        const created = await createSession(userId);
+        setSessions([created]);
+        setMessages([]);
+        setActiveSessionId(created.sessionId);
+        return;
+      }
+
+      setSessions(loadedSessions);
+      await loadSessionMessages(loadedSessions[0].sessionId);
+    } catch {
+      setHistoryError("聊天记录加载失败");
+    } finally {
+      setHistoryLoading(false);
+    }
+  }, [loadSessionMessages, userId]);
+
+  useEffect(() => {
+    void loadSessions();
+  }, [loadSessions]);
 
   useEffect(() => {
     const panel = messagesPanelRef.current;
@@ -154,6 +101,36 @@ export default function App() {
     if (!panel) return;
     const distanceFromBottom = panel.scrollHeight - panel.scrollTop - panel.clientHeight;
     autoScrollPinnedRef.current = distanceFromBottom <= 48;
+  };
+
+  const handleCreateSession = async () => {
+    setHistoryError(undefined);
+    try {
+      const created = await createSession(userId);
+      setSessions((currentSessions) => [
+        created,
+        ...currentSessions.filter(
+          (session) => session.sessionId !== created.sessionId,
+        ),
+      ]);
+      autoScrollPinnedRef.current = true;
+      setMessages([]);
+      setActiveSessionId(created.sessionId);
+      setRunTrace(undefined);
+      setRunTraceError(undefined);
+    } catch {
+      setHistoryError("新建会话失败");
+    }
+  };
+
+  const handleSelectSession = async (sessionId: string) => {
+    if (loading || sessionId === activeSessionId) return;
+    setHistoryError(undefined);
+    try {
+      await loadSessionMessages(sessionId);
+    } catch {
+      setHistoryError("聊天记录加载失败");
+    }
   };
 
   const handleStreamEvent = (agentId: string, event: ChatStreamEvent) => {
@@ -170,7 +147,7 @@ export default function App() {
 
   const handleSend = () => {
     const text = input.trim();
-    if (!text || loading) return;
+    if (!text || loading || !activeSessionId) return;
 
     const createdAt = Date.now();
     const userMessage = createUserMessage(`user-${createdAt}`, text);
@@ -183,14 +160,16 @@ export default function App() {
     setMessages((currentMessages) => [...currentMessages, userMessage, agentMessage]);
 
     streamChat({
+      userId,
+      sessionId: activeSessionId,
       message: text,
-      sessionId,
       onEvent: (event) => handleStreamEvent(agentId, event),
       onDone: () => {
         setLoading(false);
         setMessages((currentMessages) =>
           updateAgentMessage(currentMessages, agentId, finishAgentMessage),
         );
+        void listSessions(userId).then(setSessions).catch(() => undefined);
       },
       onError: (errorMessage) => {
         setLoading(false);
@@ -206,6 +185,19 @@ export default function App() {
     });
   };
 
+  const handleOpenRunTrace = async (runId: string) => {
+    setRunTrace(undefined);
+    setRunTraceError(undefined);
+    setRunTraceLoading(true);
+    try {
+      setRunTrace(await getRunDetail(userId, runId));
+    } catch {
+      setRunTraceError("执行详情加载失败");
+    } finally {
+      setRunTraceLoading(false);
+    }
+  };
+
   const handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (event.key === "Enter" && !event.shiftKey) {
       event.preventDefault();
@@ -215,14 +207,24 @@ export default function App() {
 
   return (
     <main className="app-shell">
+      <SessionSidebar
+        sessions={sessions}
+        activeSessionId={activeSessionId}
+        loading={historyLoading}
+        error={historyError}
+        onCreateSession={() => void handleCreateSession()}
+        onSelectSession={(sessionId) => void handleSelectSession(sessionId)}
+        onRetry={() => void loadSessions()}
+      />
+
       <section className="chat-surface" aria-label="Agent Hub chat">
         <header className="app-header">
           <div>
             <h1>Agent Hub</h1>
             <p>实时查看 Agent 的可观察工作过程</p>
           </div>
-          <div className="session-pill" title={sessionId}>
-            {sessionId.slice(-8)}
+          <div className="session-pill" title={activeSessionId}>
+            {(activeSessionId ?? "no-session").slice(-8)}
           </div>
         </header>
 
@@ -233,7 +235,7 @@ export default function App() {
         >
           {messages.length === 0 && (
             <div className="empty-state">
-              <strong>输入一个问题开始</strong>
+              <strong>{historyLoading ? "正在加载聊天记录" : "输入一个问题开始"}</strong>
               <span>例如：帮我算 123*456，或者问什么是 LangChain。</span>
             </div>
           )}
@@ -254,6 +256,18 @@ export default function App() {
                       message.error ? "未能生成回答。" : "等待输出..."
                     )}
                   </div>
+                  {message.runId && (
+                    <button
+                      className="run-detail-button"
+                      type="button"
+                      onClick={() => {
+                        const runId = message.runId;
+                        if (runId) void handleOpenRunTrace(runId);
+                      }}
+                    >
+                      查看执行详情
+                    </button>
+                  )}
                   {message.error && (
                     <div className="agent-error-banner" role="alert">
                       出错了：{message.error}
@@ -271,16 +285,31 @@ export default function App() {
             onChange={(event) => setInput(event.target.value)}
             onKeyDown={handleKeyDown}
             aria-label="输入问题"
-            disabled={loading}
+            disabled={loading || !activeSessionId}
             rows={2}
           />
-          <button onClick={handleSend} disabled={loading || !input.trim()}>
+          <button
+            onClick={handleSend}
+            disabled={loading || !input.trim() || !activeSessionId}
+          >
             {loading ? "运行中" : "发送"}
           </button>
         </footer>
 
         <div className="backend-line">后端：{API_BASE_URL}</div>
       </section>
+
+      {(runTrace || runTraceLoading || runTraceError) && (
+        <RunTracePanel
+          trace={runTrace}
+          loading={runTraceLoading}
+          error={runTraceError}
+          onClose={() => {
+            setRunTrace(undefined);
+            setRunTraceError(undefined);
+          }}
+        />
+      )}
     </main>
   );
 }
