@@ -74,6 +74,7 @@ export interface AgentChatMessage {
   timeline: TimelineItem[];
   currentStatus: string;
   loading: boolean;
+  runId?: string;
   error?: string;
 }
 
@@ -102,17 +103,21 @@ export function appendChatStreamEvent(
   message: AgentChatMessage,
   event: ChatStreamEvent,
 ): AgentChatMessage {
+  const nextMessage = event.runId && message.runId !== event.runId
+    ? { ...message, runId: event.runId }
+    : message;
+
   if (event.type === "stage") {
-    return appendStageEvent(message, event.stage, event.message);
+    return appendStageEvent(nextMessage, event.stage, event.message);
   }
 
   if (event.type === "tool_start") {
     return {
-      ...message,
+      ...nextMessage,
       timeline: [
-        ...message.timeline,
+        ...nextMessage.timeline,
         {
-          id: nextTimelineId("tool", message.timeline),
+          id: nextTimelineId("tool", nextMessage.timeline),
           kind: "tool",
           tool: event.tool,
           runId: event.run_id,
@@ -126,35 +131,35 @@ export function appendChatStreamEvent(
 
   if (event.type === "tool_end") {
     const timeline = completeLatestTool(
-      message.timeline,
+      nextMessage.timeline,
       event.tool,
       event.output,
       event.elapsed_ms,
       event.run_id,
     );
     return {
-      ...message,
+      ...nextMessage,
       timeline,
       currentStatus: `${event.tool} 已返回结果`,
     };
   }
 
   if (event.type === "text") {
-    const timeline = ensureAnswerItem(message.timeline);
+    const timeline = ensureAnswerItem(nextMessage.timeline);
     return {
-      ...message,
-      content: `${message.content}${event.content}`,
+      ...nextMessage,
+      content: `${nextMessage.content}${event.content}`,
       timeline,
       currentStatus: "正在生成回答",
     };
   }
 
   return {
-    ...message,
+    ...nextMessage,
     timeline: [
-      ...completeRunningItems(message.timeline, "failed"),
+      ...completeRunningItems(nextMessage.timeline, "failed"),
       {
-        id: nextTimelineId("error", message.timeline),
+        id: nextTimelineId("error", nextMessage.timeline),
         kind: "error",
         message: event.message,
         status: "failed",

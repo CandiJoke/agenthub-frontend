@@ -1,4 +1,5 @@
 import { postSseStream } from "../request/stream.js";
+import { toStreamChatBody } from "./history.js";
 
 export type ChatStage =
   | "received"
@@ -7,20 +8,28 @@ export type ChatStage =
   | "answering"
   | "completed";
 
+export type ChatStreamEventBase = { runId?: string };
+
 export type ChatStreamEvent =
-  | { type: "stage"; stage: ChatStage; message: string }
-  | { type: "tool_start"; tool: string; input: string; run_id?: string }
-  | {
+  | ({ type: "stage"; stage: ChatStage; message: string } & ChatStreamEventBase)
+  | ({
+      type: "tool_start";
+      tool: string;
+      input: string;
+      run_id?: string;
+    } & ChatStreamEventBase)
+  | ({
       type: "tool_end";
       tool: string;
       output: string;
       elapsed_ms?: number;
       run_id?: string;
-    }
-  | { type: "text"; content: string }
-  | { type: "error"; message: string };
+    } & ChatStreamEventBase)
+  | ({ type: "text"; content: string } & ChatStreamEventBase)
+  | ({ type: "error"; message: string } & ChatStreamEventBase);
 
 export interface StreamChatOptions {
+  userId: string;
   message: string;
   sessionId: string;
   onEvent: (event: ChatStreamEvent) => void;
@@ -29,6 +38,7 @@ export interface StreamChatOptions {
 }
 
 export function streamChat({
+  userId,
   message,
   sessionId,
   onEvent,
@@ -37,7 +47,7 @@ export function streamChat({
 }: StreamChatOptions): AbortController {
   return postSseStream<ChatStreamEvent>({
     path: "/chat/stream",
-    body: { message, session_id: sessionId },
+    body: toStreamChatBody({ userId, sessionId, message }),
     onEvent,
     onDone,
     onError,

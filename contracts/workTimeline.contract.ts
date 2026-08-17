@@ -198,4 +198,13 @@ assert.equal(
   `${"x".repeat(500)}\n...内容已截断`,
 );
 
+let runIdMessage = createPendingAgentMessage("agent-run");
+runIdMessage = appendChatStreamEvent(runIdMessage, {
+  type: "stage",
+  stage: "received",
+  message: "已收到问题",
+  runId: "run-a",
+});
+assert.equal(runIdMessage.runId, "run-a");
+
 console.log("workTimeline contracts passed");
