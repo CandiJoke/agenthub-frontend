@@ -58,6 +58,16 @@ export function createSessionRequest(
   };
 }
 
+export function deleteSessionRequest(
+  userId: string,
+  sessionId: string,
+): { path: string; method: "DELETE" } {
+  return {
+    path: `/users/${encodeURIComponent(userId)}/sessions/${encodeURIComponent(sessionId)}`,
+    method: "DELETE",
+  };
+}
+
 export function toStreamChatBody(body: StreamChatBody): StreamChatBody {
   return body;
 }
@@ -71,6 +81,14 @@ export function listSessions(userId: string): Promise<ChatSessionDto[]> {
 export function createSession(userId: string): Promise<ChatSessionDto> {
   const request = createSessionRequest(userId);
   return requestJson<ChatSessionDto>(request.path, { method: request.method });
+}
+
+export async function deleteSession(
+  userId: string,
+  sessionId: string,
+): Promise<void> {
+  const request = deleteSessionRequest(userId, sessionId);
+  await requestJson<void>(request.path, { method: request.method });
 }
 
 export function listMessages(

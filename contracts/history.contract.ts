@@ -3,7 +3,12 @@ import { readFileSync } from "node:fs";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
-import { createSessionRequest, toStreamChatBody } from "../src/api/history.js";
+import {
+  createSessionRequest,
+  deleteSession,
+  deleteSessionRequest,
+  toStreamChatBody,
+} from "../src/api/history.js";
 import { RunTracePanel } from "../src/chat/RunTracePanel.js";
 import { SessionSidebar } from "../src/chat/SessionSidebar.js";
 import {
@@ -50,6 +55,26 @@ assert.deepEqual(createSessionRequest("user-a"), {
   path: "/users/user-a/sessions",
   method: "POST",
 });
+
+assert.deepEqual(deleteSessionRequest("user-a", "session-a"), {
+  path: "/users/user-a/sessions/session-a",
+  method: "DELETE",
+});
+
+const originalFetch = globalThis.fetch;
+try {
+  let deleteRequestSeen = false;
+  globalThis.fetch = async (input, init) => {
+    deleteRequestSeen = true;
+    assert.match(String(input), /\/users\/user-a\/sessions\/session-a$/);
+    assert.equal(init?.method, "DELETE");
+    return new Response(null, { status: 204 });
+  };
+  await deleteSession("user-a", "session-a");
+  assert.equal(deleteRequestSeen, true);
+} finally {
+  globalThis.fetch = originalFetch;
+}
 
 assert.deepEqual(
   toStreamChatBody({
@@ -133,12 +158,15 @@ const sidebarHtml = renderToStaticMarkup(
     actionsDisabled: true,
     onCreateSession: () => undefined,
     onSelectSession: () => undefined,
+    onDeleteSession: () => undefined,
     onRetry: () => undefined,
   }),
 );
 assert.match(sidebarHtml, /聊天记录/);
 assert.match(sidebarHtml, /新建/);
 assert.match(sidebarHtml, /session-row-active/);
+assert.match(sidebarHtml, /删除/);
+assert.match(sidebarHtml, /session-delete-action/);
 assert.match(sidebarHtml, /disabled=""/);
 
 const appCss = readFileSync("src/App.css", "utf8");

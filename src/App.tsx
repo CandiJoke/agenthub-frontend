@@ -3,6 +3,7 @@ import "./App.css";
 import { streamChat, type ChatStreamEvent } from "./api/chat";
 import {
   createSession,
+  deleteSession,
   getRunDetail,
   listMessages,
   listSessions,
@@ -48,6 +49,7 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [historyLoading, setHistoryLoading] = useState(true);
   const [historyError, setHistoryError] = useState<string>();
+  const [deletingSessionId, setDeletingSessionId] = useState<string>();
   const [runTrace, setRunTrace] = useState<RunTraceDto>();
   const [runTraceLoading, setRunTraceLoading] = useState(false);
   const [runTraceError, setRunTraceError] = useState<string>();
@@ -173,6 +175,61 @@ export default function App() {
     }
   };
 
+  const handleDeleteSession = async (sessionId: string) => {
+    if (loading || deletingSessionId) return;
+    if (!window.confirm("删除这段聊天记录？")) return;
+
+    const requestId = ++historyRequestIdRef.current;
+    runTraceRequestIdRef.current += 1;
+    setDeletingSessionId(sessionId);
+    setHistoryLoading(true);
+    setHistoryError(undefined);
+    try {
+      await deleteSession(userId, sessionId);
+      if (historyRequestIdRef.current !== requestId) return;
+
+      const remainingSessions = sessions.filter(
+        (session) => session.sessionId !== sessionId,
+      );
+      setSessions(remainingSessions);
+
+      if (runTrace?.run.sessionId === sessionId) {
+        setRunTrace(undefined);
+        setRunTraceError(undefined);
+        setRunTraceLoading(false);
+      }
+
+      if (sessionId !== activeSessionId) return;
+
+      if (remainingSessions.length === 0) {
+        autoScrollPinnedRef.current = true;
+        setMessages([]);
+        setActiveSessionId(undefined);
+        setRunTrace(undefined);
+        setRunTraceError(undefined);
+        setRunTraceLoading(false);
+
+        const created = await createSession(userId);
+        if (historyRequestIdRef.current !== requestId) return;
+
+        setSessions([created]);
+        setActiveSessionId(created.sessionId);
+        return;
+      }
+
+      await loadSessionMessages(remainingSessions[0].sessionId, requestId);
+    } catch {
+      if (historyRequestIdRef.current === requestId) {
+        setHistoryError("删除会话失败");
+      }
+    } finally {
+      if (historyRequestIdRef.current === requestId) {
+        setHistoryLoading(false);
+        setDeletingSessionId(undefined);
+      }
+    }
+  };
+
   const handleStreamEvent = (agentId: string, event: ChatStreamEvent) => {
     setMessages((currentMessages) =>
       updateAgentMessage(currentMessages, agentId, (agentMessage) =>
@@ -266,10 +323,12 @@ export default function App() {
         sessions={sessions}
         activeSessionId={activeSessionId}
         loading={historyLoading}
-        actionsDisabled={loading}
+        actionsDisabled={loading || deletingSessionId !== undefined}
+        deletingSessionId={deletingSessionId}
         error={historyError}
         onCreateSession={() => void handleCreateSession()}
         onSelectSession={(sessionId) => void handleSelectSession(sessionId)}
+        onDeleteSession={(sessionId) => void handleDeleteSession(sessionId)}
         onRetry={() => void loadSessions()}
       />
 
