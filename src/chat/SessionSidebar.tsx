@@ -4,6 +4,7 @@ interface SessionSidebarProps {
   sessions: ChatSessionDto[];
   activeSessionId?: string;
   loading: boolean;
+  actionsDisabled?: boolean;
   error?: string;
   onCreateSession: () => void;
   onSelectSession: (sessionId: string) => void;
@@ -25,6 +26,7 @@ export function SessionSidebar({
   sessions,
   activeSessionId,
   loading,
+  actionsDisabled = false,
   error,
   onCreateSession,
   onSelectSession,
@@ -34,14 +36,14 @@ export function SessionSidebar({
     <aside className="session-sidebar" aria-label="聊天历史">
       <div className="session-sidebar-header">
         <span>聊天记录</span>
-        <button type="button" onClick={onCreateSession}>
+        <button type="button" onClick={onCreateSession} disabled={actionsDisabled}>
           新建
         </button>
       </div>
       {error && (
         <div className="session-error">
           <span>{error}</span>
-          <button type="button" onClick={onRetry}>
+          <button type="button" onClick={onRetry} disabled={actionsDisabled}>
             重试
           </button>
         </div>
@@ -57,6 +59,7 @@ export function SessionSidebar({
                   ? "session-row session-row-active"
                   : "session-row"
               }
+              disabled={actionsDisabled}
               onClick={() => onSelectSession(session.sessionId)}
             >
               <span className="session-title">{session.title}</span>

@@ -53,23 +53,38 @@ export default function App() {
   const [runTraceError, setRunTraceError] = useState<string>();
   const messagesPanelRef = useRef<HTMLDivElement>(null);
   const autoScrollPinnedRef = useRef(true);
+  const historyRequestIdRef = useRef(0);
+  const runTraceRequestIdRef = useRef(0);
 
-  const loadSessionMessages = useCallback(async (sessionId: string) => {
+  const loadSessionMessages = useCallback(async (
+    sessionId: string,
+    requestId = ++historyRequestIdRef.current,
+  ) => {
+    runTraceRequestIdRef.current += 1;
     const persistedMessages = await listMessages(userId, sessionId);
+    if (historyRequestIdRef.current !== requestId) return false;
+
     autoScrollPinnedRef.current = true;
     setRunTrace(undefined);
     setRunTraceError(undefined);
+    setRunTraceLoading(false);
     setMessages(mapPersistedMessages(persistedMessages));
     setActiveSessionId(sessionId);
+    return true;
   }, [userId]);
 
   const loadSessions = useCallback(async () => {
+    const requestId = ++historyRequestIdRef.current;
     setHistoryLoading(true);
     setHistoryError(undefined);
     try {
       const loadedSessions = await listSessions(userId);
+      if (historyRequestIdRef.current !== requestId) return;
+
       if (loadedSessions.length === 0) {
         const created = await createSession(userId);
+        if (historyRequestIdRef.current !== requestId) return;
+
         setSessions([created]);
         setMessages([]);
         setActiveSessionId(created.sessionId);
@@ -77,11 +92,15 @@ export default function App() {
       }
 
       setSessions(loadedSessions);
-      await loadSessionMessages(loadedSessions[0].sessionId);
+      await loadSessionMessages(loadedSessions[0].sessionId, requestId);
     } catch {
-      setHistoryError("聊天记录加载失败");
+      if (historyRequestIdRef.current === requestId) {
+        setHistoryError("聊天记录加载失败");
+      }
     } finally {
-      setHistoryLoading(false);
+      if (historyRequestIdRef.current === requestId) {
+        setHistoryLoading(false);
+      }
     }
   }, [loadSessionMessages, userId]);
 
@@ -104,9 +123,15 @@ export default function App() {
   };
 
   const handleCreateSession = async () => {
+    if (loading) return;
+
+    const requestId = ++historyRequestIdRef.current;
+    setHistoryLoading(true);
     setHistoryError(undefined);
     try {
       const created = await createSession(userId);
+      if (historyRequestIdRef.current !== requestId) return;
+
       setSessions((currentSessions) => [
         created,
         ...currentSessions.filter(
@@ -119,17 +144,32 @@ export default function App() {
       setRunTrace(undefined);
       setRunTraceError(undefined);
     } catch {
-      setHistoryError("新建会话失败");
+      if (historyRequestIdRef.current === requestId) {
+        setHistoryError("新建会话失败");
+      }
+    } finally {
+      if (historyRequestIdRef.current === requestId) {
+        setHistoryLoading(false);
+      }
     }
   };
 
   const handleSelectSession = async (sessionId: string) => {
     if (loading || sessionId === activeSessionId) return;
+
+    const requestId = ++historyRequestIdRef.current;
+    setHistoryLoading(true);
     setHistoryError(undefined);
     try {
-      await loadSessionMessages(sessionId);
+      await loadSessionMessages(sessionId, requestId);
     } catch {
-      setHistoryError("聊天记录加载失败");
+      if (historyRequestIdRef.current === requestId) {
+        setHistoryError("聊天记录加载失败");
+      }
+    } finally {
+      if (historyRequestIdRef.current === requestId) {
+        setHistoryLoading(false);
+      }
     }
   };
 
@@ -186,16 +226,31 @@ export default function App() {
   };
 
   const handleOpenRunTrace = async (runId: string) => {
+    const requestId = ++runTraceRequestIdRef.current;
     setRunTrace(undefined);
     setRunTraceError(undefined);
     setRunTraceLoading(true);
     try {
-      setRunTrace(await getRunDetail(userId, runId));
+      const trace = await getRunDetail(userId, runId);
+      if (runTraceRequestIdRef.current === requestId) {
+        setRunTrace(trace);
+      }
     } catch {
-      setRunTraceError("执行详情加载失败");
+      if (runTraceRequestIdRef.current === requestId) {
+        setRunTraceError("执行详情加载失败");
+      }
     } finally {
-      setRunTraceLoading(false);
+      if (runTraceRequestIdRef.current === requestId) {
+        setRunTraceLoading(false);
+      }
     }
+  };
+
+  const handleCloseRunTrace = () => {
+    runTraceRequestIdRef.current += 1;
+    setRunTrace(undefined);
+    setRunTraceError(undefined);
+    setRunTraceLoading(false);
   };
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -211,6 +266,7 @@ export default function App() {
         sessions={sessions}
         activeSessionId={activeSessionId}
         loading={historyLoading}
+        actionsDisabled={loading}
         error={historyError}
         onCreateSession={() => void handleCreateSession()}
         onSelectSession={(sessionId) => void handleSelectSession(sessionId)}
@@ -304,10 +360,7 @@ export default function App() {
           trace={runTrace}
           loading={runTraceLoading}
           error={runTraceError}
-          onClose={() => {
-            setRunTrace(undefined);
-            setRunTraceError(undefined);
-          }}
+          onClose={handleCloseRunTrace}
         />
       )}
     </main>

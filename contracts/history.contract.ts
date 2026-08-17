@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
@@ -23,12 +24,27 @@ class MemoryStorage {
   }
 }
 
+class ThrowingStorage {
+  getItem(): string | null {
+    throw new Error("storage unavailable");
+  }
+
+  setItem(): void {
+    throw new Error("storage unavailable");
+  }
+}
+
 const storage = new MemoryStorage();
 const firstUserId = getOrCreateUserId(storage);
 const secondUserId = getOrCreateUserId(storage);
 
 assert.match(firstUserId, /^anon_user_/);
 assert.equal(secondUserId, firstUserId);
+
+const fallbackUserId = getOrCreateUserId(new ThrowingStorage());
+const repeatedFallbackUserId = getOrCreateUserId(new ThrowingStorage());
+assert.match(fallbackUserId, /^anon_user_/);
+assert.equal(repeatedFallbackUserId, fallbackUserId);
 
 assert.deepEqual(createSessionRequest("user-a"), {
   path: "/users/user-a/sessions",
@@ -114,6 +130,7 @@ const sidebarHtml = renderToStaticMarkup(
     ],
     activeSessionId: "session-a",
     loading: false,
+    actionsDisabled: true,
     onCreateSession: () => undefined,
     onSelectSession: () => undefined,
     onRetry: () => undefined,
@@ -122,6 +139,11 @@ const sidebarHtml = renderToStaticMarkup(
 assert.match(sidebarHtml, /聊天记录/);
 assert.match(sidebarHtml, /新建/);
 assert.match(sidebarHtml, /session-row-active/);
+assert.match(sidebarHtml, /disabled=""/);
+
+const appCss = readFileSync("src/App.css", "utf8");
+assert.match(appCss, /\.session-sidebar\s*{[^}]*display:\s*grid/s);
+assert.match(appCss, /\.session-list\s*{[^}]*overflow-y:\s*auto/s);
 
 const runTraceHtml = renderToStaticMarkup(
   createElement(RunTracePanel, {
