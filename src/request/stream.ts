@@ -1,4 +1,4 @@
-import { API_BASE_URL } from "../config/env.js";
+import { buildApiUrl } from "./http.js";
 
 export interface PostSseStreamOptions<TEvent> {
   path: string;
@@ -6,10 +6,6 @@ export interface PostSseStreamOptions<TEvent> {
   onEvent: (event: TEvent) => void;
   onDone: () => void;
   onError: (err: string) => void;
-}
-
-function buildUrl(path: string): string {
-  return `${API_BASE_URL}${path.startsWith("/") ? path : `/${path}`}`;
 }
 
 export function postSseStream<TEvent>({
@@ -21,7 +17,7 @@ export function postSseStream<TEvent>({
 }: PostSseStreamOptions<TEvent>): AbortController {
   const controller = new AbortController();
 
-  fetch(buildUrl(path), {
+  fetch(buildApiUrl(path), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
