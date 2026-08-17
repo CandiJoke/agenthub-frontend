@@ -1,5 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import "./App.css";
+import {
+  listCapabilities,
+  type CapabilityCatalogDto,
+} from "./api/capabilities";
 import { streamChat, type ChatStreamEvent } from "./api/chat";
 import {
   createSession,
@@ -25,6 +29,7 @@ import {
   type ChatMessage,
 } from "./chat/workTimeline";
 import { API_BASE_URL } from "./config/env";
+import { CapabilityPanel } from "./chat/CapabilityPanel";
 import { getOrCreateUserId } from "./session/userIdentity";
 
 function updateAgentMessage(
@@ -66,6 +71,9 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [historyLoading, setHistoryLoading] = useState(true);
   const [historyError, setHistoryError] = useState<string>();
+  const [capabilityCatalog, setCapabilityCatalog] = useState<CapabilityCatalogDto>();
+  const [capabilityLoading, setCapabilityLoading] = useState(true);
+  const [capabilityError, setCapabilityError] = useState<string>();
   const [deletingSessionId, setDeletingSessionId] = useState<string>();
   const [runTrace, setRunTrace] = useState<RunTraceDto>();
   const [runTraceLoading, setRunTraceLoading] = useState(false);
@@ -76,6 +84,7 @@ export default function App() {
   const runTraceRequestIdRef = useRef(0);
   const activeStreamRef = useRef<AbortController | undefined>(undefined);
   const activeAgentIdRef = useRef<string | undefined>(undefined);
+  const capabilityRequestIdRef = useRef(0);
 
   const loadSessionMessages = useCallback(async (
     sessionId: string,
@@ -125,9 +134,33 @@ export default function App() {
     }
   }, [loadSessionMessages, userId]);
 
+  const loadCapabilityCatalog = useCallback(async () => {
+    const requestId = ++capabilityRequestIdRef.current;
+    setCapabilityLoading(true);
+    setCapabilityError(undefined);
+    try {
+      const catalog = await listCapabilities();
+      if (capabilityRequestIdRef.current === requestId) {
+        setCapabilityCatalog(catalog);
+      }
+    } catch {
+      if (capabilityRequestIdRef.current === requestId) {
+        setCapabilityError("能力目录加载失败");
+      }
+    } finally {
+      if (capabilityRequestIdRef.current === requestId) {
+        setCapabilityLoading(false);
+      }
+    }
+  }, []);
+
   useEffect(() => {
     void loadSessions();
   }, [loadSessions]);
+
+  useEffect(() => {
+    void loadCapabilityCatalog();
+  }, [loadCapabilityCatalog]);
 
   useEffect(() => () => {
     activeStreamRef.current?.abort();
@@ -532,6 +565,13 @@ export default function App() {
           onClose={handleCloseRunTrace}
         />
       )}
+
+      <CapabilityPanel
+        catalog={capabilityCatalog}
+        loading={capabilityLoading}
+        error={capabilityError}
+        onRetry={() => void loadCapabilityCatalog()}
+      />
     </main>
   );
 }
