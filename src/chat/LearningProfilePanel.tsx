@@ -1,5 +1,8 @@
+import { useMemo, useState } from "react";
+
 import type {
   ChildProfileDto,
+  LearningSubject,
   LearningWeaknessDto,
   WeaknessCategory,
   WeaknessSeverity,
@@ -44,6 +47,13 @@ const statusLabels: Record<WeaknessStatus, string> = {
   resolved: "已解决",
 };
 
+const subjectFilterOptions: Array<LearningSubject | "all"> = [
+  "all",
+  "chinese",
+  "english",
+  "math",
+];
+
 function gradeLabel(grade?: string): string {
   if (grade === "first_grade") return "一年级";
   return "一年级";
@@ -70,7 +80,14 @@ export function LearningProfilePanel({
   error,
   onRetry,
 }: LearningProfilePanelProps) {
-  const activeCount = activeWeaknessCount(weaknesses);
+  const [selectedSubject, setSelectedSubject] = useState<LearningSubject | "all">(
+    "all",
+  );
+  const visibleWeaknesses = useMemo(() => {
+    if (selectedSubject === "all") return weaknesses;
+    return weaknesses.filter((item) => item.subject === selectedSubject);
+  }, [selectedSubject, weaknesses]);
+  const activeCount = activeWeaknessCount(visibleWeaknesses);
 
   return (
     <section className="learning-profile-panel" aria-label="学习画像">
@@ -94,24 +111,37 @@ export function LearningProfilePanel({
         <>
           <LearningHexagonCanvas weaknesses={weaknesses} />
 
+          <div className="learning-subject-filter" aria-label="学科筛选">
+            {subjectFilterOptions.map((subject) => (
+              <button
+                key={subject}
+                type="button"
+                className={subject === selectedSubject ? "is-active" : undefined}
+                onClick={() => setSelectedSubject(subject)}
+              >
+                {subject === "all" ? "全部" : subjectLabels[subject]}
+              </button>
+            ))}
+          </div>
+
           <div className="learning-profile-metrics">
             <div>
               <strong>{activeCount}</strong>
               <span>进行中</span>
             </div>
             <div>
-              <strong>{weaknesses.length}</strong>
+              <strong>{visibleWeaknesses.length}</strong>
               <span>累计记录</span>
             </div>
           </div>
 
-          {weaknesses.length === 0 && (
+          {visibleWeaknesses.length === 0 && (
             <div className="learning-profile-empty">暂无薄弱点记录</div>
           )}
 
-          {weaknesses.length > 0 && (
+          {visibleWeaknesses.length > 0 && (
             <ol className="learning-weakness-list">
-              {weaknesses.map((weakness) => (
+              {visibleWeaknesses.map((weakness) => (
                 <li className="learning-weakness-row" key={weakness.weaknessId}>
                   <div className="learning-weakness-main">
                     <span>{weakness.title}</span>

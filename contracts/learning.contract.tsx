@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
@@ -130,6 +131,7 @@ assert.match(html, /学习画像/);
 assert.match(html, /一年级/);
 assert.match(html, /3<\/strong><span>进行中/);
 assert.match(html, /learning-hexagon-canvas/);
+assert.match(html, /全部/);
 assert.match(html, /b\/p\/d\/q 混淆/);
 assert.match(html, /b\/d 字母认反/);
 assert.match(html, /口算慢/);
@@ -141,6 +143,10 @@ assert.match(html, /中等/);
 assert.match(html, /更新/);
 assert.match(html, /8\/18/);
 assert.doesNotMatch(html, /2<\/strong><span>进行中/);
+
+const css = await readFile("src/App.css", "utf8");
+assert.match(css, /\.learning-subject-filter/);
+assert.match(css, /\.learning-hexagon-canvas/);
 
 const emptyHtml = renderToStaticMarkup(
   createElement(LearningProfilePanel, {
