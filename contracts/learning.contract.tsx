@@ -91,6 +91,12 @@ try {
     if (path.endsWith("/profile")) {
       return new Response(JSON.stringify(profile), { status: 200 });
     }
+    if (path.endsWith("?subject=math")) {
+      return new Response(
+        JSON.stringify(weaknesses.filter((item) => item.subject === "math")),
+        { status: 200 },
+      );
+    }
     return new Response(JSON.stringify(weaknesses), { status: 200 });
   };
 
@@ -102,7 +108,8 @@ try {
 
   assert.equal(loadedProfile.childId, "default");
   assert.equal(loadedWeaknesses.length, 4);
-  assert.equal(loadedMathWeaknesses.length, 4);
+  assert.equal(loadedMathWeaknesses.length, 1);
+  assert.equal(loadedMathWeaknesses[0].subject, "math");
   assert.match(paths[0], /\/users\/user-a\/children\/default\/profile$/);
   assert.match(paths[1], /\/users\/user-a\/children\/default\/weaknesses$/);
   assert.match(
