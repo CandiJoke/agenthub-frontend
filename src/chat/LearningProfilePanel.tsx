@@ -5,6 +5,8 @@ import type {
   WeaknessSeverity,
   WeaknessStatus,
 } from "../api/learning.js";
+import { LearningHexagonCanvas } from "./LearningHexagonCanvas.js";
+import { subjectLabels } from "./learningHexagon.js";
 
 interface LearningProfilePanelProps {
   profile?: ChildProfileDto;
@@ -20,6 +22,14 @@ const categoryLabels: Record<WeaknessCategory, string> = {
   reading: "朗读",
   expression: "表达",
   learning_habit: "习惯",
+  listening: "听音",
+  phonics: "拼读",
+  vocabulary: "词汇",
+  speaking: "口语",
+  number_sense: "数感",
+  calculation: "计算",
+  word_problem: "应用",
+  geometry: "图形",
 };
 
 const severityLabels: Record<WeaknessSeverity, string> = {
@@ -82,6 +92,8 @@ export function LearningProfilePanel({
 
       {!loading && !error && (
         <>
+          <LearningHexagonCanvas weaknesses={weaknesses} />
+
           <div className="learning-profile-metrics">
             <div>
               <strong>{activeCount}</strong>
@@ -106,6 +118,7 @@ export function LearningProfilePanel({
                     <p>{weakness.evidence}</p>
                   </div>
                   <div className="learning-weakness-meta">
+                    <span>{subjectLabels[weakness.subject]}</span>
                     <span>{categoryLabels[weakness.category]}</span>
                     <span>{severityLabels[weakness.severity]}</span>
                     <span>{statusLabels[weakness.status]}</span>

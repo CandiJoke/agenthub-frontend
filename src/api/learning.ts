@@ -1,13 +1,21 @@
 import { requestJson } from "../request/http.js";
 
-export type LearningSubject = "chinese";
+export type LearningSubject = "chinese" | "english" | "math";
 export type LearningGrade = "first_grade";
 export type WeaknessCategory =
   | "pinyin"
   | "character_recognition"
   | "reading"
   | "expression"
-  | "learning_habit";
+  | "learning_habit"
+  | "listening"
+  | "phonics"
+  | "vocabulary"
+  | "speaking"
+  | "number_sense"
+  | "calculation"
+  | "word_problem"
+  | "geometry";
 export type WeaknessSeverity = "mild" | "medium" | "high";
 export type WeaknessStatus = "active" | "improving" | "resolved";
 
@@ -44,8 +52,12 @@ export function getDefaultChildProfile(userId: string): Promise<ChildProfileDto>
 
 export function listDefaultChildWeaknesses(
   userId: string,
+  options: { subject?: LearningSubject } = {},
 ): Promise<LearningWeaknessDto[]> {
+  const query = options.subject
+    ? `?subject=${encodeURIComponent(options.subject)}`
+    : "";
   return requestJson<LearningWeaknessDto[]>(
-    `/users/${encodeURIComponent(userId)}/children/default/weaknesses`,
+    `/users/${encodeURIComponent(userId)}/children/default/weaknesses${query}`,
   );
 }

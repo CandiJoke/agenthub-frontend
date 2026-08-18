@@ -8,6 +8,7 @@ import {
   type ChildProfileDto,
   type LearningWeaknessDto,
 } from "../src/api/learning.js";
+import { calculateSubjectHexagonScores } from "../src/chat/learningHexagon.js";
 import { LearningProfilePanel } from "../src/chat/LearningProfilePanel.js";
 
 const originalFetch = globalThis.fetch;
@@ -51,6 +52,34 @@ const weaknesses: LearningWeaknessDto[] = [
     createdAt: "2026-08-17T00:00:00Z",
     updatedAt: "2026-08-17T00:00:00Z",
   },
+  {
+    weaknessId: "weakness-c",
+    userId: "user-a",
+    childId: "default",
+    subject: "english",
+    grade: "first_grade",
+    category: "phonics",
+    title: "b/d 字母认反",
+    evidence: "经常把 b 和 d 看反。",
+    severity: "medium",
+    status: "active",
+    createdAt: "2026-08-18T00:00:00Z",
+    updatedAt: "2026-08-18T10:00:00+08:00",
+  },
+  {
+    weaknessId: "weakness-d",
+    userId: "user-a",
+    childId: "default",
+    subject: "math",
+    grade: "first_grade",
+    category: "calculation",
+    title: "口算慢",
+    evidence: "10 以内口算会停很久。",
+    severity: "high",
+    status: "active",
+    createdAt: "2026-08-18T00:00:00Z",
+    updatedAt: "2026-08-18T10:20:00+08:00",
+  },
 ];
 
 try {
@@ -66,14 +95,27 @@ try {
 
   const loadedProfile = await getDefaultChildProfile("user-a");
   const loadedWeaknesses = await listDefaultChildWeaknesses("user-a");
+  const loadedMathWeaknesses = await listDefaultChildWeaknesses("user-a", {
+    subject: "math",
+  });
 
   assert.equal(loadedProfile.childId, "default");
-  assert.equal(loadedWeaknesses.length, 2);
+  assert.equal(loadedWeaknesses.length, 4);
+  assert.equal(loadedMathWeaknesses.length, 4);
   assert.match(paths[0], /\/users\/user-a\/children\/default\/profile$/);
   assert.match(paths[1], /\/users\/user-a\/children\/default\/weaknesses$/);
+  assert.match(
+    paths[2],
+    /\/users\/user-a\/children\/default\/weaknesses\?subject=math$/,
+  );
 } finally {
   globalThis.fetch = originalFetch;
 }
+
+const scores = calculateSubjectHexagonScores(weaknesses);
+assert.equal(scores.math.dimensions.calculation, 64);
+assert.equal(scores.english.dimensions.phonics, 76);
+assert.equal(scores.chinese.dimensions.pinyin, 76);
 
 const html = renderToStaticMarkup(
   createElement(LearningProfilePanel, {
@@ -86,9 +128,15 @@ const html = renderToStaticMarkup(
 
 assert.match(html, /学习画像/);
 assert.match(html, /一年级/);
-assert.match(html, /1<\/strong><span>进行中/);
+assert.match(html, /3<\/strong><span>进行中/);
+assert.match(html, /learning-hexagon-canvas/);
 assert.match(html, /b\/p\/d\/q 混淆/);
+assert.match(html, /b\/d 字母认反/);
+assert.match(html, /口算慢/);
 assert.match(html, /拼音/);
+assert.match(html, /语文/);
+assert.match(html, /英语/);
+assert.match(html, /数学/);
 assert.match(html, /中等/);
 assert.match(html, /更新/);
 assert.match(html, /8\/18/);
