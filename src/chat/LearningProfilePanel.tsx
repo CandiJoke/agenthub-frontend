@@ -1,0 +1,111 @@
+import type {
+  ChildProfileDto,
+  LearningWeaknessDto,
+  WeaknessCategory,
+  WeaknessSeverity,
+  WeaknessStatus,
+} from "../api/learning.js";
+
+interface LearningProfilePanelProps {
+  profile?: ChildProfileDto;
+  weaknesses?: LearningWeaknessDto[];
+  loading: boolean;
+  error?: string;
+  onRetry: () => void;
+}
+
+const categoryLabels: Record<WeaknessCategory, string> = {
+  pinyin: "拼音",
+  character_recognition: "识字",
+  reading: "朗读",
+  expression: "表达",
+  learning_habit: "习惯",
+};
+
+const severityLabels: Record<WeaknessSeverity, string> = {
+  mild: "轻微",
+  medium: "中等",
+  high: "明显",
+};
+
+const statusLabels: Record<WeaknessStatus, string> = {
+  active: "进行中",
+  improving: "改善中",
+  resolved: "已解决",
+};
+
+function gradeLabel(grade?: string): string {
+  if (grade === "first_grade") return "一年级";
+  return "一年级";
+}
+
+function activeWeaknessCount(weaknesses: LearningWeaknessDto[]): number {
+  return weaknesses.filter((item) => item.status !== "resolved").length;
+}
+
+export function LearningProfilePanel({
+  profile,
+  weaknesses = [],
+  loading,
+  error,
+  onRetry,
+}: LearningProfilePanelProps) {
+  const activeCount = activeWeaknessCount(weaknesses);
+
+  return (
+    <section className="learning-profile-panel" aria-label="学习画像">
+      <div className="learning-profile-header">
+        <span>学习画像</span>
+        <span>{gradeLabel(profile?.grade)}</span>
+      </div>
+
+      {error && (
+        <div className="learning-profile-error">
+          <span>{error}</span>
+          <button type="button" onClick={onRetry}>
+            重试
+          </button>
+        </div>
+      )}
+
+      {loading && <div className="learning-profile-loading">加载中...</div>}
+
+      {!loading && !error && (
+        <>
+          <div className="learning-profile-metrics">
+            <div>
+              <strong>{activeCount}</strong>
+              <span>进行中</span>
+            </div>
+            <div>
+              <strong>{weaknesses.length}</strong>
+              <span>累计记录</span>
+            </div>
+          </div>
+
+          {weaknesses.length === 0 && (
+            <div className="learning-profile-empty">暂无薄弱点记录</div>
+          )}
+
+          {weaknesses.length > 0 && (
+            <ol className="learning-weakness-list">
+              {weaknesses.map((weakness) => (
+                <li className="learning-weakness-row" key={weakness.weaknessId}>
+                  <div className="learning-weakness-main">
+                    <span>{weakness.title}</span>
+                    <p>{weakness.evidence}</p>
+                  </div>
+                  <div className="learning-weakness-meta">
+                    <span>{categoryLabels[weakness.category]}</span>
+                    <span>{severityLabels[weakness.severity]}</span>
+                    <span>{statusLabels[weakness.status]}</span>
+                  </div>
+                </li>
+              ))}
+            </ol>
+          )}
+        </>
+      )}
+    </section>
+  );
+}
