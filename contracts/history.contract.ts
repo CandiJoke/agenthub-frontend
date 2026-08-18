@@ -228,7 +228,10 @@ assert.match(sidebarHtml, /session-delete-action/);
 assert.match(sidebarHtml, /disabled=""/);
 
 const appCss = readFileSync("src/App.css", "utf8");
-assert.match(appCss, /\.session-sidebar,\s*\.capability-panel\s*{[^}]*display:\s*grid/s);
+assert.match(
+  appCss,
+  /\.session-sidebar,\s*\.capability-panel,\s*\.learning-profile-panel\s*{[^}]*display:\s*grid/s,
+);
 assert.match(appCss, /\.session-list\s*{[^}]*overflow-y:\s*auto/s);
 
 const runTraceHtml = renderToStaticMarkup(

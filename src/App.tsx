@@ -6,6 +6,12 @@ import {
 } from "./api/capabilities";
 import { streamChat, type ChatStreamEvent } from "./api/chat";
 import {
+  getDefaultChildProfile,
+  listDefaultChildWeaknesses,
+  type ChildProfileDto,
+  type LearningWeaknessDto,
+} from "./api/learning";
+import {
   createSession,
   deleteSession,
   getRunDetail,
@@ -30,6 +36,7 @@ import {
 } from "./chat/workTimeline";
 import { API_BASE_URL } from "./config/env";
 import { CapabilityPanel } from "./chat/CapabilityPanel";
+import { LearningProfilePanel } from "./chat/LearningProfilePanel";
 import { getOrCreateUserId } from "./session/userIdentity";
 
 function updateAgentMessage(
@@ -74,6 +81,10 @@ export default function App() {
   const [capabilityCatalog, setCapabilityCatalog] = useState<CapabilityCatalogDto>();
   const [capabilityLoading, setCapabilityLoading] = useState(true);
   const [capabilityError, setCapabilityError] = useState<string>();
+  const [childProfile, setChildProfile] = useState<ChildProfileDto>();
+  const [learningWeaknesses, setLearningWeaknesses] = useState<LearningWeaknessDto[]>([]);
+  const [learningLoading, setLearningLoading] = useState(true);
+  const [learningError, setLearningError] = useState<string>();
   const [deletingSessionId, setDeletingSessionId] = useState<string>();
   const [runTrace, setRunTrace] = useState<RunTraceDto>();
   const [runTraceLoading, setRunTraceLoading] = useState(false);
@@ -85,6 +96,7 @@ export default function App() {
   const activeStreamRef = useRef<AbortController | undefined>(undefined);
   const activeAgentIdRef = useRef<string | undefined>(undefined);
   const capabilityRequestIdRef = useRef(0);
+  const learningRequestIdRef = useRef(0);
 
   const loadSessionMessages = useCallback(async (
     sessionId: string,
@@ -154,6 +166,30 @@ export default function App() {
     }
   }, []);
 
+  const loadLearningProfile = useCallback(async () => {
+    const requestId = ++learningRequestIdRef.current;
+    setLearningLoading(true);
+    setLearningError(undefined);
+    try {
+      const [profile, weaknesses] = await Promise.all([
+        getDefaultChildProfile(userId),
+        listDefaultChildWeaknesses(userId),
+      ]);
+      if (learningRequestIdRef.current === requestId) {
+        setChildProfile(profile);
+        setLearningWeaknesses(weaknesses);
+      }
+    } catch {
+      if (learningRequestIdRef.current === requestId) {
+        setLearningError("学习画像加载失败");
+      }
+    } finally {
+      if (learningRequestIdRef.current === requestId) {
+        setLearningLoading(false);
+      }
+    }
+  }, [userId]);
+
   useEffect(() => {
     void loadSessions();
   }, [loadSessions]);
@@ -161,6 +197,10 @@ export default function App() {
   useEffect(() => {
     void loadCapabilityCatalog();
   }, [loadCapabilityCatalog]);
+
+  useEffect(() => {
+    void loadLearningProfile();
+  }, [loadLearningProfile]);
 
   useEffect(() => () => {
     activeStreamRef.current?.abort();
@@ -293,6 +333,13 @@ export default function App() {
       ),
     );
 
+    if (
+      event.type === "tool_end" &&
+      event.tool === "record_chinese_literacy_weakness"
+    ) {
+      void loadLearningProfile();
+    }
+
     if (event.type === "error" || event.type === "stopped") {
       if (activeAgentIdRef.current === agentId) {
         activeStreamRef.current = undefined;
@@ -329,6 +376,7 @@ export default function App() {
           updateAgentMessage(currentMessages, agentId, finishAgentMessage),
         );
         void listSessions(userId).then(setSessions).catch(() => undefined);
+        void loadLearningProfile();
       },
       onError: (errorMessage) => {
         if (activeAgentIdRef.current === agentId) {
@@ -566,12 +614,21 @@ export default function App() {
         />
       )}
 
-      <CapabilityPanel
-        catalog={capabilityCatalog}
-        loading={capabilityLoading}
-        error={capabilityError}
-        onRetry={() => void loadCapabilityCatalog()}
-      />
+      <aside className="right-insight-rail" aria-label="学习和能力面板">
+        <LearningProfilePanel
+          profile={childProfile}
+          weaknesses={learningWeaknesses}
+          loading={learningLoading}
+          error={learningError}
+          onRetry={() => void loadLearningProfile()}
+        />
+        <CapabilityPanel
+          catalog={capabilityCatalog}
+          loading={capabilityLoading}
+          error={capabilityError}
+          onRetry={() => void loadCapabilityCatalog()}
+        />
+      </aside>
     </main>
   );
 }

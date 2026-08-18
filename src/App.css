@@ -61,9 +61,9 @@
 }
 
 .session-sidebar,
-.capability-panel {
+.capability-panel,
+.learning-profile-panel {
   min-width: 0;
-  height: calc(100vh - 48px);
   display: grid;
   border: 1px solid #d9e1ec;
   border-radius: 8px;
@@ -73,7 +73,18 @@
 }
 
 .session-sidebar {
+  height: calc(100vh - 48px);
   grid-template-rows: auto auto auto minmax(0, 1fr);
+}
+
+.right-insight-rail {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+  min-width: 0;
+  height: calc(100vh - 48px);
+  min-height: 0;
+  overflow-y: auto;
 }
 
 .capability-panel {
@@ -82,6 +93,7 @@
 
 .session-sidebar-header,
 .capability-header,
+.learning-profile-header,
 .run-trace-header {
   display: flex;
   align-items: center;
@@ -97,6 +109,7 @@
 .session-sidebar-header button,
 .session-error button,
 .capability-error button,
+.learning-profile-error button,
 .run-trace-header button {
   flex: 0 0 auto;
   border: 1px solid #cdd8e6;
@@ -112,6 +125,7 @@
 .session-sidebar-header button:hover,
 .session-error button:hover,
 .capability-error button:hover,
+.learning-profile-error button:hover,
 .run-trace-header button:hover,
 .agent-action-button:hover,
 .run-detail-button:hover {
@@ -122,6 +136,7 @@
 .session-sidebar-header button:disabled,
 .session-error button:disabled,
 .capability-error button:disabled,
+.learning-profile-error button:disabled,
 .agent-action-button:disabled,
 .session-row:disabled {
   cursor: not-allowed;
@@ -233,7 +248,10 @@
 .session-loading,
 .capability-error,
 .capability-loading,
-.capability-empty {
+.capability-empty,
+.learning-profile-error,
+.learning-profile-loading,
+.learning-profile-empty {
   display: grid;
   gap: 8px;
   padding: 12px 14px;
@@ -259,8 +277,104 @@
   background: #fff7f7;
 }
 
-.capability-error button {
+.capability-error button,
+.learning-profile-error button {
   justify-self: start;
+}
+
+.learning-profile-header span:last-child {
+  color: #7a879a;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.learning-profile-error {
+  color: #991b1b;
+  background: #fff7f7;
+}
+
+.learning-profile-metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  padding: 10px 12px;
+  border-bottom: 1px solid #e5ebf3;
+  background: #fbfcfe;
+}
+
+.learning-profile-metrics div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  border: 1px solid #e1e7f0;
+  border-radius: 8px;
+  padding: 8px;
+  background: #ffffff;
+}
+
+.learning-profile-metrics strong {
+  color: #263348;
+  font-size: 18px;
+  line-height: 1.2;
+  font-weight: 750;
+}
+
+.learning-profile-metrics span {
+  color: #728096;
+  font-size: 11px;
+}
+
+.learning-weakness-list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 10px;
+  list-style: none;
+}
+
+.learning-weakness-row {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  border: 1px solid #e1e7f0;
+  border-radius: 8px;
+  padding: 10px;
+  background: #ffffff;
+}
+
+.learning-weakness-main {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+.learning-weakness-main span {
+  color: #263348;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.learning-weakness-main p {
+  margin: 0;
+  color: #607089;
+  font-size: 12px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.learning-weakness-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.learning-weakness-meta span {
+  border-radius: 999px;
+  padding: 3px 7px;
+  color: #475569;
+  background: #f1f5f9;
+  font-size: 11px;
+  line-height: 1.2;
 }
 
 .capability-metrics {
@@ -998,10 +1112,11 @@
     align-items: start;
   }
 
-  .capability-panel {
+  .right-insight-rail {
     grid-column: 1 / -1;
     height: auto;
-    max-height: 260px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
   }
 }
 
@@ -1034,8 +1149,13 @@
     border-radius: 0;
   }
 
-  .capability-panel {
-    max-height: 230px;
+  .right-insight-rail {
+    grid-template-columns: 1fr;
+    padding-bottom: 12px;
+  }
+
+  .capability-panel,
+  .learning-profile-panel {
     border-inline: 0;
     border-radius: 0;
   }
