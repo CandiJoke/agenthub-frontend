@@ -13,6 +13,7 @@ export interface CapabilityDto {
   status: CapabilityStatus;
   source: string;
   enabled: boolean;
+  tools?: string[];
 }
 
 export interface CapabilityCatalogDto {

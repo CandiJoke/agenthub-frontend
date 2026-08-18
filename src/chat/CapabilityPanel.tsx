@@ -24,14 +24,22 @@ function statusLabel(status: CapabilityStatus): string {
 
 function capabilityCounts(catalog?: CapabilityCatalogDto): {
   toolCount: number;
-  skillReady: boolean;
+  skillCount: number;
 } {
   const capabilities = catalog?.capabilities ?? [];
   return {
     toolCount: capabilities.filter(
-      (capability) => capability.type === "tool" && capability.enabled,
+      (capability) =>
+        capability.type === "tool" &&
+        capability.enabled &&
+        capability.status === "available",
     ).length,
-    skillReady: Boolean(catalog?.supportedTypes.includes("skill")),
+    skillCount: capabilities.filter(
+      (capability) =>
+        capability.type === "skill" &&
+        capability.enabled &&
+        capability.status === "available",
+    ).length,
   };
 }
 
@@ -50,6 +58,18 @@ function CapabilityRow({ capability }: { capability: CapabilityDto }) {
           {statusLabel(capability.status)}
         </span>
       </div>
+      {capability.tools && capability.tools.length > 0 && (
+        <div className="capability-bindings">
+          <span>绑定工具</span>
+          <div>
+            {capability.tools.map((tool) => (
+              <code className="capability-tool-chip" key={tool}>
+                {tool}
+              </code>
+            ))}
+          </div>
+        </div>
+      )}
     </li>
   );
 }
@@ -91,8 +111,8 @@ export function CapabilityPanel({
               <span>Tools</span>
             </div>
             <div>
-              <strong>{counts.skillReady ? "Skill" : "-"}</strong>
-              <span>Next</span>
+              <strong>{counts.skillCount}</strong>
+              <span>Active Skills</span>
             </div>
           </div>
 
@@ -104,13 +124,6 @@ export function CapabilityPanel({
 
           {capabilities.length === 0 && (
             <div className="capability-empty">暂无可用能力</div>
-          )}
-
-          {counts.skillReady && (
-            <div className="skill-extension-slot">
-              <span>Skill</span>
-              <strong>扩展位已预留</strong>
-            </div>
           )}
         </>
       )}
