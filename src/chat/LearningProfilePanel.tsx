@@ -39,6 +39,16 @@ function gradeLabel(grade?: string): string {
   return "一年级";
 }
 
+function formatUpdatedAt(updatedAt: string): string {
+  const date = new Date(updatedAt);
+  if (Number.isNaN(date.getTime())) return "时间未知";
+  const month = date.getMonth() + 1;
+  const day = date.getDate();
+  const hour = String(date.getHours()).padStart(2, "0");
+  const minute = String(date.getMinutes()).padStart(2, "0");
+  return `${month}/${day} ${hour}:${minute}`;
+}
+
 function activeWeaknessCount(weaknesses: LearningWeaknessDto[]): number {
   return weaknesses.filter((item) => item.status !== "resolved").length;
 }
@@ -99,6 +109,9 @@ export function LearningProfilePanel({
                     <span>{categoryLabels[weakness.category]}</span>
                     <span>{severityLabels[weakness.severity]}</span>
                     <span>{statusLabels[weakness.status]}</span>
+                    <span className="learning-weakness-time">
+                      更新 {formatUpdatedAt(weakness.updatedAt)}
+                    </span>
                   </div>
                 </li>
               ))}

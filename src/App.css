@@ -377,6 +377,11 @@
   line-height: 1.2;
 }
 
+.learning-weakness-meta .learning-weakness-time {
+  color: #64748b;
+  background: #f8fafc;
+}
+
 .capability-metrics {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

@@ -35,7 +35,7 @@ const weaknesses: LearningWeaknessDto[] = [
     status: "active",
     sourceRunId: "run-a",
     createdAt: "2026-08-18T00:00:00Z",
-    updatedAt: "2026-08-18T00:00:00Z",
+    updatedAt: "2026-08-18T09:30:00+08:00",
   },
   {
     weaknessId: "weakness-b",
@@ -90,6 +90,8 @@ assert.match(html, /1<\/strong><span>进行中/);
 assert.match(html, /b\/p\/d\/q 混淆/);
 assert.match(html, /拼音/);
 assert.match(html, /中等/);
+assert.match(html, /更新/);
+assert.match(html, /8\/18/);
 assert.doesNotMatch(html, /2<\/strong><span>进行中/);
 
 const emptyHtml = renderToStaticMarkup(
