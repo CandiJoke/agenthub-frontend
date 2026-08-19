@@ -1,7 +1,13 @@
 import { requestJson } from "../request/http.js";
 
 export type LearningSubject = "chinese" | "english" | "math";
-export type LearningGrade = "first_grade";
+export type LearningGrade =
+  | "grade_1"
+  | "grade_2"
+  | "grade_3"
+  | "grade_4"
+  | "grade_5"
+  | "grade_6";
 export type WeaknessCategory =
   | "pinyin"
   | "character_recognition"
@@ -44,9 +50,26 @@ export interface LearningWeaknessDto {
   updatedAt: string;
 }
 
+export interface UpdateChildProfileRequest {
+  grade: LearningGrade;
+}
+
 export function getDefaultChildProfile(userId: string): Promise<ChildProfileDto> {
   return requestJson<ChildProfileDto>(
     `/users/${encodeURIComponent(userId)}/children/default/profile`,
+  );
+}
+
+export function updateDefaultChildProfile(
+  userId: string,
+  request: UpdateChildProfileRequest,
+): Promise<ChildProfileDto> {
+  return requestJson<ChildProfileDto>(
+    `/users/${encodeURIComponent(userId)}/children/default/profile`,
+    {
+      method: "PATCH",
+      body: JSON.stringify(request),
+    },
   );
 }
 

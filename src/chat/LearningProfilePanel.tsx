@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 
 import type {
   ChildProfileDto,
+  LearningGrade,
   LearningSubject,
   LearningWeaknessDto,
   WeaknessCategory,
@@ -54,9 +55,19 @@ const subjectFilterOptions: Array<LearningSubject | "all"> = [
   "math",
 ];
 
+const gradeLabels: Record<LearningGrade | "first_grade", string> = {
+  grade_1: "一年级",
+  grade_2: "二年级",
+  grade_3: "三年级",
+  grade_4: "四年级",
+  grade_5: "五年级",
+  grade_6: "六年级",
+  first_grade: "一年级",
+};
+
 function gradeLabel(grade?: string): string {
-  if (grade === "first_grade") return "一年级";
-  return "一年级";
+  if (!grade) return "一年级";
+  return gradeLabels[grade as LearningGrade | "first_grade"] ?? "一年级";
 }
 
 function formatUpdatedAt(updatedAt: string): string {

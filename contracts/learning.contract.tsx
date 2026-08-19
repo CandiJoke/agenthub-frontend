@@ -6,6 +6,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import {
   getDefaultChildProfile,
   listDefaultChildWeaknesses,
+  updateDefaultChildProfile,
   type ChildProfileDto,
   type LearningWeaknessDto,
 } from "../src/api/learning.js";
@@ -18,7 +19,7 @@ const profile: ChildProfileDto = {
   userId: "user-a",
   childId: "default",
   displayName: "孩子",
-  grade: "first_grade",
+  grade: "grade_3",
   createdAt: "2026-08-18T00:00:00Z",
   updatedAt: "2026-08-18T00:00:00Z",
 };
@@ -29,7 +30,7 @@ const weaknesses: LearningWeaknessDto[] = [
     userId: "user-a",
     childId: "default",
     subject: "chinese",
-    grade: "first_grade",
+    grade: "grade_3",
     category: "pinyin",
     title: "b/p/d/q 混淆",
     evidence: "拼读时经常混淆。",
@@ -44,7 +45,7 @@ const weaknesses: LearningWeaknessDto[] = [
     userId: "user-a",
     childId: "default",
     subject: "chinese",
-    grade: "first_grade",
+    grade: "grade_3",
     category: "reading",
     title: "朗读漏字",
     evidence: "朗读时漏字。",
@@ -58,7 +59,7 @@ const weaknesses: LearningWeaknessDto[] = [
     userId: "user-a",
     childId: "default",
     subject: "english",
-    grade: "first_grade",
+    grade: "grade_3",
     category: "phonics",
     title: "b/d 字母认反",
     evidence: "经常把 b 和 d 看反。",
@@ -72,7 +73,7 @@ const weaknesses: LearningWeaknessDto[] = [
     userId: "user-a",
     childId: "default",
     subject: "math",
-    grade: "first_grade",
+    grade: "grade_3",
     category: "calculation",
     title: "口算慢",
     evidence: "10 以内口算会停很久。",
@@ -84,10 +85,22 @@ const weaknesses: LearningWeaknessDto[] = [
 ];
 
 try {
-  const paths: string[] = [];
-  globalThis.fetch = async (input) => {
+  const requests: Array<{ body?: BodyInit | null; method: string; path: string }> = [];
+  globalThis.fetch = async (input, init) => {
     const path = String(input);
-    paths.push(path);
+    const method = init?.method ?? "GET";
+    requests.push({ body: init?.body, method, path });
+    if (method === "PATCH" && path.endsWith("/profile")) {
+      assert.equal(JSON.parse(String(init?.body)).grade, "grade_4");
+      return new Response(
+        JSON.stringify({
+          ...profile,
+          grade: "grade_4",
+          updatedAt: "2026-08-19T10:00:00Z",
+        }),
+        { status: 200 },
+      );
+    }
     if (path.endsWith("/profile")) {
       return new Response(JSON.stringify(profile), { status: 200 });
     }
@@ -105,17 +118,24 @@ try {
   const loadedMathWeaknesses = await listDefaultChildWeaknesses("user-a", {
     subject: "math",
   });
+  const updatedProfile = await updateDefaultChildProfile("user-a", {
+    grade: "grade_4",
+  });
 
   assert.equal(loadedProfile.childId, "default");
+  assert.equal(loadedProfile.grade, "grade_3");
+  assert.equal(updatedProfile.grade, "grade_4");
   assert.equal(loadedWeaknesses.length, 4);
   assert.equal(loadedMathWeaknesses.length, 1);
   assert.equal(loadedMathWeaknesses[0].subject, "math");
-  assert.match(paths[0], /\/users\/user-a\/children\/default\/profile$/);
-  assert.match(paths[1], /\/users\/user-a\/children\/default\/weaknesses$/);
+  assert.match(requests[0].path, /\/users\/user-a\/children\/default\/profile$/);
+  assert.match(requests[1].path, /\/users\/user-a\/children\/default\/weaknesses$/);
   assert.match(
-    paths[2],
+    requests[2].path,
     /\/users\/user-a\/children\/default\/weaknesses\?subject=math$/,
   );
+  assert.match(requests[3].path, /\/users\/user-a\/children\/default\/profile$/);
+  assert.equal(requests[3].method, "PATCH");
 } finally {
   globalThis.fetch = originalFetch;
 }
@@ -135,7 +155,8 @@ const html = renderToStaticMarkup(
 );
 
 assert.match(html, /学习画像/);
-assert.match(html, /一年级/);
+assert.match(html, /三年级/);
+assert.doesNotMatch(html, /一年级/);
 assert.match(html, /3<\/strong><span>进行中/);
 assert.match(html, /learning-profile-body/);
 assert.match(html, /learning-hexagon-canvas/);
