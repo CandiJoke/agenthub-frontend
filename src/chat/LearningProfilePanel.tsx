@@ -158,6 +158,13 @@ export function LearningProfilePanel({
                     <div className="learning-weakness-main">
                       <span>{weakness.title}</span>
                       <p>{weakness.evidence}</p>
+                      {weakness.behaviorTitle && (
+                        <div className="learning-weakness-behavior">
+                          <span>可观察表现</span>
+                          <strong>{weakness.behaviorTitle}</strong>
+                          {weakness.abilityTitle && <em>{weakness.abilityTitle}</em>}
+                        </div>
+                      )}
                     </div>
                     <div className="learning-weakness-meta">
                       <span>{subjectLabels[weakness.subject]}</span>

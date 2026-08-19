@@ -536,6 +536,35 @@
   overflow-wrap: anywhere;
 }
 
+.learning-weakness-behavior {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  border-left: 3px solid #2f855a;
+  padding: 6px 8px;
+  background: #f0fdf4;
+}
+
+.learning-weakness-behavior span {
+  color: #166534;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.learning-weakness-behavior strong {
+  color: #1f3b2d;
+  font-size: 12px;
+  line-height: 1.35;
+  font-weight: 650;
+  overflow-wrap: anywhere;
+}
+
+.learning-weakness-behavior em {
+  color: #52665a;
+  font-size: 11px;
+  font-style: normal;
+}
+
 .learning-weakness-meta {
   display: flex;
   flex-wrap: wrap;

@@ -45,9 +45,48 @@ export interface LearningWeaknessDto {
   evidence: string;
   severity: WeaknessSeverity;
   status: WeaknessStatus;
+  abilityId?: string;
+  abilityTitle?: string;
+  behaviorId?: string;
+  behaviorTitle?: string;
+  matchConfidence?: number;
   sourceRunId?: string;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface CurriculumBehaviorDto {
+  behaviorId: string;
+  title: string;
+  evidenceExamples?: string[];
+}
+
+export interface CurriculumAbilityDto {
+  abilityId: string;
+  title: string;
+  category: WeaknessCategory;
+  behaviors: CurriculumBehaviorDto[];
+}
+
+export interface CurriculumDomainDto {
+  domainId: string;
+  title: string;
+  abilities: CurriculumAbilityDto[];
+}
+
+export interface CurriculumSubjectDto {
+  subject: LearningSubject;
+  label: string;
+  availability?: string;
+  domains: CurriculumDomainDto[];
+}
+
+export interface CurriculumGradeDto {
+  schemaVersion: "curriculum_tree.v1";
+  stage: "primary";
+  grade: LearningGrade;
+  gradeLabel: string;
+  subjects: CurriculumSubjectDto[];
 }
 
 export interface UpdateChildProfileRequest {
@@ -70,6 +109,14 @@ export function updateDefaultChildProfile(
       method: "PATCH",
       body: JSON.stringify(request),
     },
+  );
+}
+
+export function getPrimaryGradeCurriculum(
+  grade: LearningGrade,
+): Promise<CurriculumGradeDto> {
+  return requestJson<CurriculumGradeDto>(
+    `/curriculum/primary/grades/${encodeURIComponent(grade)}`,
   );
 }
 

@@ -5,9 +5,11 @@ import { renderToStaticMarkup } from "react-dom/server";
 
 import {
   getDefaultChildProfile,
+  getPrimaryGradeCurriculum,
   listDefaultChildWeaknesses,
   updateDefaultChildProfile,
   type ChildProfileDto,
+  type CurriculumGradeDto,
   type LearningWeaknessDto,
 } from "../src/api/learning.js";
 import { calculateSubjectHexagonScores } from "../src/chat/learningHexagon.js";
@@ -36,6 +38,11 @@ const weaknesses: LearningWeaknessDto[] = [
     evidence: "拼读时经常混淆。",
     severity: "medium",
     status: "active",
+    abilityId: "chinese_g1_pinyin_initials",
+    abilityTitle: "声母辨认",
+    behaviorId: "chinese_g1_pinyin_initials_distinguish_bpdq",
+    behaviorTitle: "能区分 b/p/d/q 的形和音",
+    matchConfidence: 0.82,
     sourceRunId: "run-a",
     createdAt: "2026-08-18T00:00:00Z",
     updatedAt: "2026-08-18T09:30:00+08:00",
@@ -84,6 +91,39 @@ const weaknesses: LearningWeaknessDto[] = [
   },
 ];
 
+const curriculum: CurriculumGradeDto = {
+  schemaVersion: "curriculum_tree.v1",
+  stage: "primary",
+  grade: "grade_1",
+  gradeLabel: "一年级",
+  subjects: [
+    {
+      subject: "chinese",
+      label: "语文",
+      domains: [
+        {
+          domainId: "chinese_g1_pinyin",
+          title: "拼音与识字基础",
+          abilities: [
+            {
+              abilityId: "chinese_g1_pinyin_initials",
+              title: "声母辨认",
+              category: "pinyin",
+              behaviors: [
+                {
+                  behaviorId: "chinese_g1_pinyin_initials_distinguish_bpdq",
+                  title: "能区分 b/p/d/q 的形和音",
+                  evidenceExamples: ["把 b 看成 d"],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    },
+  ],
+};
+
 try {
   const requests: Array<{ body?: BodyInit | null; method: string; path: string }> = [];
   globalThis.fetch = async (input, init) => {
@@ -104,6 +144,9 @@ try {
     if (path.endsWith("/profile")) {
       return new Response(JSON.stringify(profile), { status: 200 });
     }
+    if (path.endsWith("/curriculum/primary/grades/grade_1")) {
+      return new Response(JSON.stringify(curriculum), { status: 200 });
+    }
     if (path.endsWith("?subject=math")) {
       return new Response(
         JSON.stringify(weaknesses.filter((item) => item.subject === "math")),
@@ -121,10 +164,13 @@ try {
   const updatedProfile = await updateDefaultChildProfile("user-a", {
     grade: "grade_4",
   });
+  const loadedCurriculum = await getPrimaryGradeCurriculum("grade_1");
 
   assert.equal(loadedProfile.childId, "default");
   assert.equal(loadedProfile.grade, "grade_3");
   assert.equal(updatedProfile.grade, "grade_4");
+  assert.equal(loadedCurriculum.grade, "grade_1");
+  assert.equal(loadedCurriculum.subjects[0].domains[0].abilities[0].title, "声母辨认");
   assert.equal(loadedWeaknesses.length, 4);
   assert.equal(loadedMathWeaknesses.length, 1);
   assert.equal(loadedMathWeaknesses[0].subject, "math");
@@ -136,6 +182,7 @@ try {
   );
   assert.match(requests[3].path, /\/users\/user-a\/children\/default\/profile$/);
   assert.equal(requests[3].method, "PATCH");
+  assert.match(requests[4].path, /\/curriculum\/primary\/grades\/grade_1$/);
 } finally {
   globalThis.fetch = originalFetch;
 }
@@ -162,6 +209,9 @@ assert.match(html, /learning-profile-body/);
 assert.match(html, /learning-hexagon-canvas/);
 assert.match(html, /全部/);
 assert.match(html, /b\/p\/d\/q 混淆/);
+assert.match(html, /可观察表现/);
+assert.match(html, /能区分 b\/p\/d\/q 的形和音/);
+assert.match(html, /声母辨认/);
 assert.match(html, /b\/d 字母认反/);
 assert.match(html, /口算慢/);
 assert.match(html, /拼音/);
@@ -185,6 +235,7 @@ assert.match(css, /\.learning-profile-body\s*{[^}]*min-height:\s*0/s);
 assert.match(css, /\.learning-hexagon-canvas\s*{[^}]*height:\s*248px/s);
 assert.match(css, /\.learning-hexagon-legend\s*{[^}]*padding:\s*8px 12px 12px/s);
 assert.match(css, /\.learning-hexagon-legend span\s*{[^}]*font-weight:\s*650/s);
+assert.match(css, /\.learning-weakness-behavior/);
 
 const canvasSource = await readFile("src/chat/LearningHexagonCanvas.tsx", "utf8");
 assert.match(canvasSource, /drawSubjectLabel/);
