@@ -137,6 +137,7 @@ const html = renderToStaticMarkup(
 assert.match(html, /学习画像/);
 assert.match(html, /一年级/);
 assert.match(html, /3<\/strong><span>进行中/);
+assert.match(html, /learning-profile-body/);
 assert.match(html, /learning-hexagon-canvas/);
 assert.match(html, /全部/);
 assert.match(html, /b\/p\/d\/q 混淆/);
@@ -154,6 +155,14 @@ assert.doesNotMatch(html, /2<\/strong><span>进行中/);
 const css = await readFile("src/App.css", "utf8");
 assert.match(css, /\.learning-subject-filter/);
 assert.match(css, /\.learning-hexagon-canvas/);
+assert.match(
+  css,
+  /\.learning-profile-panel\s*{[^}]*grid-template-rows:\s*auto minmax\(0,\s*1fr\)/s,
+);
+assert.match(css, /\.learning-profile-body\s*{[^}]*overflow-y:\s*auto/s);
+assert.match(css, /\.learning-profile-body\s*{[^}]*min-height:\s*0/s);
+assert.match(css, /\.learning-hexagon-canvas\s*{[^}]*height:\s*248px/s);
+assert.match(css, /\.learning-hexagon-legend\s*{[^}]*padding:\s*8px 12px 12px/s);
 
 const emptyHtml = renderToStaticMarkup(
   createElement(LearningProfilePanel, {

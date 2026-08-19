@@ -18,6 +18,7 @@ const subjectColors: Record<LearningSubject, string> = {
   math: "#d97706",
 };
 
+const CANVAS_HEIGHT = 248;
 const subjects: LearningSubject[] = ["chinese", "english", "math"];
 
 function hexPoint(
@@ -83,16 +84,14 @@ function drawSubjectHexagon(
   context.fill();
   context.stroke();
 
-  context.fillStyle = "#1f2a3d";
-  context.font = "600 12px system-ui, sans-serif";
-  context.textAlign = "center";
-  context.fillText(score.label, centerX, centerY + radius + 24);
-
   context.fillStyle = "#64748b";
   context.font = "10px system-ui, sans-serif";
+  context.textBaseline = "middle";
   score.axes.forEach((axis, index) => {
-    const point = hexPoint(centerX, centerY, radius + 12, index, score.axes.length);
-    context.fillText(categoryLabels[axis] ?? axis, point.x, point.y + 3);
+    const point = hexPoint(centerX, centerY, radius + 13, index, score.axes.length);
+    const offsetX = point.x - centerX;
+    context.textAlign = Math.abs(offsetX) < 4 ? "center" : offsetX < 0 ? "right" : "left";
+    context.fillText(categoryLabels[axis] ?? axis, point.x, point.y, 36);
   });
   context.restore();
 }
@@ -109,25 +108,51 @@ export function LearningHexagonCanvas({ weaknesses }: LearningHexagonCanvasProps
     const context = canvas?.getContext("2d");
     if (!canvas || !context) return;
 
-    context.clearRect(0, 0, canvas.width, canvas.height);
-    context.fillStyle = "#fbfcfe";
-    context.fillRect(0, 0, canvas.width, canvas.height);
+    const draw = () => {
+      const cssWidth = Math.max(
+        260,
+        Math.round(canvas.getBoundingClientRect().width || canvas.clientWidth || 300),
+      );
+      const pixelRatio = Math.max(window.devicePixelRatio || 1, 1);
+      canvas.width = Math.round(cssWidth * pixelRatio);
+      canvas.height = Math.round(CANVAS_HEIGHT * pixelRatio);
+      context.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
+      context.clearRect(0, 0, cssWidth, CANVAS_HEIGHT);
+      context.fillStyle = "#fbfcfe";
+      context.fillRect(0, 0, cssWidth, CANVAS_HEIGHT);
 
-    const centers = [
-      { x: 76, y: 86 },
-      { x: 180, y: 86 },
-      { x: 284, y: 86 },
-    ];
-    subjects.forEach((subject, index) => {
-      drawSubjectHexagon(context, scores[subject], centers[index].x, centers[index].y, 42);
-    });
+      const chartWidth = cssWidth / subjects.length;
+      const radius = Math.min(34, Math.max(28, chartWidth * 0.28));
+      const centerY = 96;
+      subjects.forEach((subject, index) => {
+        drawSubjectHexagon(
+          context,
+          scores[subject],
+          chartWidth * index + chartWidth / 2,
+          centerY,
+          radius,
+        );
+      });
 
-    if (weaknesses.length === 0) {
-      context.fillStyle = "#64748b";
-      context.font = "12px system-ui, sans-serif";
-      context.textAlign = "center";
-      context.fillText("暂无明显薄弱点", canvas.width / 2, canvas.height - 16);
+      if (weaknesses.length === 0) {
+        context.fillStyle = "#64748b";
+        context.font = "12px system-ui, sans-serif";
+        context.textAlign = "center";
+        context.textBaseline = "alphabetic";
+        context.fillText("暂无明显薄弱点", cssWidth / 2, CANVAS_HEIGHT - 18);
+      }
+    };
+
+    draw();
+
+    if (typeof ResizeObserver === "undefined") {
+      window.addEventListener("resize", draw);
+      return () => window.removeEventListener("resize", draw);
     }
+
+    const observer = new ResizeObserver(draw);
+    observer.observe(canvas);
+    return () => observer.disconnect();
   }, [scores, weaknesses.length]);
 
   return (
@@ -137,7 +162,7 @@ export function LearningHexagonCanvas({ weaknesses }: LearningHexagonCanvasProps
         ref={canvasRef}
         className="learning-hexagon-canvas"
         width={360}
-        height={220}
+        height={CANVAS_HEIGHT}
         aria-label="语文、英语、数学学习画像六边形图"
       />
       <div className="learning-hexagon-legend" aria-hidden="true">

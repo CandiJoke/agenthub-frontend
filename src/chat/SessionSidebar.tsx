@@ -2,7 +2,7 @@ import { useRef, useState } from "react";
 
 import type { ChatSessionDto } from "../api/history.js";
 
-interface SessionSidebarProps {
+export interface SessionSidebarProps {
   sessions: ChatSessionDto[];
   activeSessionId?: string;
   loading: boolean;
@@ -13,6 +13,7 @@ interface SessionSidebarProps {
   onSelectSession: (sessionId: string) => void;
   onDeleteSession: (sessionId: string) => void;
   onRetry: () => void;
+  onClose?: () => void;
 }
 
 interface TouchPoint {
@@ -43,6 +44,7 @@ export function SessionSidebar({
   onSelectSession,
   onDeleteSession,
   onRetry,
+  onClose,
 }: SessionSidebarProps) {
   const [openDeleteSessionId, setOpenDeleteSessionId] = useState<string>();
   const touchStartRef = useRef<TouchPoint | undefined>(undefined);
@@ -74,9 +76,27 @@ export function SessionSidebar({
     <aside className="session-sidebar" aria-label="聊天历史">
       <div className="session-sidebar-header">
         <span>聊天记录</span>
-        <button type="button" onClick={onCreateSession} disabled={actionsDisabled}>
-          新建
-        </button>
+        <div className="session-sidebar-actions">
+          <button
+            type="button"
+            className="session-create-button"
+            onClick={onCreateSession}
+            disabled={actionsDisabled}
+          >
+            新建
+          </button>
+          {onClose && (
+            <button
+              type="button"
+              className="session-close-button"
+              aria-label="关闭聊天记录"
+              data-history-initial-focus=""
+              onClick={onClose}
+            >
+              <span aria-hidden="true">×</span>
+            </button>
+          )}
+        </div>
       </div>
       {error && (
         <div className="session-error">

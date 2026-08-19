@@ -96,72 +96,74 @@ export function LearningProfilePanel({
         <span>{gradeLabel(profile?.grade)}</span>
       </div>
 
-      {error && (
-        <div className="learning-profile-error">
-          <span>{error}</span>
-          <button type="button" onClick={onRetry}>
-            重试
-          </button>
-        </div>
-      )}
-
-      {loading && <div className="learning-profile-loading">加载中...</div>}
-
-      {!loading && !error && (
-        <>
-          <LearningHexagonCanvas weaknesses={weaknesses} />
-
-          <div className="learning-subject-filter" aria-label="学科筛选">
-            {subjectFilterOptions.map((subject) => (
-              <button
-                key={subject}
-                type="button"
-                className={subject === selectedSubject ? "is-active" : undefined}
-                onClick={() => setSelectedSubject(subject)}
-              >
-                {subject === "all" ? "全部" : subjectLabels[subject]}
-              </button>
-            ))}
+      <div className="learning-profile-body">
+        {error && (
+          <div className="learning-profile-error">
+            <span>{error}</span>
+            <button type="button" onClick={onRetry}>
+              重试
+            </button>
           </div>
+        )}
 
-          <div className="learning-profile-metrics">
-            <div>
-              <strong>{activeCount}</strong>
-              <span>进行中</span>
-            </div>
-            <div>
-              <strong>{visibleWeaknesses.length}</strong>
-              <span>累计记录</span>
-            </div>
-          </div>
+        {loading && <div className="learning-profile-loading">加载中...</div>}
 
-          {visibleWeaknesses.length === 0 && (
-            <div className="learning-profile-empty">暂无薄弱点记录</div>
-          )}
+        {!loading && !error && (
+          <>
+            <LearningHexagonCanvas weaknesses={weaknesses} />
 
-          {visibleWeaknesses.length > 0 && (
-            <ol className="learning-weakness-list">
-              {visibleWeaknesses.map((weakness) => (
-                <li className="learning-weakness-row" key={weakness.weaknessId}>
-                  <div className="learning-weakness-main">
-                    <span>{weakness.title}</span>
-                    <p>{weakness.evidence}</p>
-                  </div>
-                  <div className="learning-weakness-meta">
-                    <span>{subjectLabels[weakness.subject]}</span>
-                    <span>{categoryLabels[weakness.category]}</span>
-                    <span>{severityLabels[weakness.severity]}</span>
-                    <span>{statusLabels[weakness.status]}</span>
-                    <span className="learning-weakness-time">
-                      更新 {formatUpdatedAt(weakness.updatedAt)}
-                    </span>
-                  </div>
-                </li>
+            <div className="learning-subject-filter" aria-label="学科筛选">
+              {subjectFilterOptions.map((subject) => (
+                <button
+                  key={subject}
+                  type="button"
+                  className={subject === selectedSubject ? "is-active" : undefined}
+                  onClick={() => setSelectedSubject(subject)}
+                >
+                  {subject === "all" ? "全部" : subjectLabels[subject]}
+                </button>
               ))}
-            </ol>
-          )}
-        </>
-      )}
+            </div>
+
+            <div className="learning-profile-metrics">
+              <div>
+                <strong>{activeCount}</strong>
+                <span>进行中</span>
+              </div>
+              <div>
+                <strong>{visibleWeaknesses.length}</strong>
+                <span>累计记录</span>
+              </div>
+            </div>
+
+            {visibleWeaknesses.length === 0 && (
+              <div className="learning-profile-empty">暂无薄弱点记录</div>
+            )}
+
+            {visibleWeaknesses.length > 0 && (
+              <ol className="learning-weakness-list">
+                {visibleWeaknesses.map((weakness) => (
+                  <li className="learning-weakness-row" key={weakness.weaknessId}>
+                    <div className="learning-weakness-main">
+                      <span>{weakness.title}</span>
+                      <p>{weakness.evidence}</p>
+                    </div>
+                    <div className="learning-weakness-meta">
+                      <span>{subjectLabels[weakness.subject]}</span>
+                      <span>{categoryLabels[weakness.category]}</span>
+                      <span>{severityLabels[weakness.severity]}</span>
+                      <span>{statusLabels[weakness.status]}</span>
+                      <span className="learning-weakness-time">
+                        更新 {formatUpdatedAt(weakness.updatedAt)}
+                      </span>
+                    </div>
+                  </li>
+                ))}
+              </ol>
+            )}
+          </>
+        )}
+      </div>
     </section>
   );
 }

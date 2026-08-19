@@ -1,4 +1,10 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+} from "react";
 import "./App.css";
 import {
   listCapabilities,
@@ -22,9 +28,16 @@ import {
 } from "./api/history";
 import { MarkdownMessage } from "./chat/MarkdownMessage";
 import { RunTracePanel } from "./chat/RunTracePanel";
-import { SessionSidebar } from "./chat/SessionSidebar";
+import { SessionHistoryDialog } from "./chat/SessionHistoryDialog";
 import { ThinkingMessage } from "./chat/ThinkingMessage";
 import { Timeline } from "./chat/Timeline";
+import {
+  CHAT_DEFAULT_WIDTH,
+  CHAT_MIN_WIDTH,
+  clampChatWidth,
+  getChatWidthBounds,
+  type ChatWidthBounds,
+} from "./chat/chatLayout";
 import { mapPersistedMessages } from "./chat/historyMapping";
 import {
   appendChatStreamEvent,
@@ -89,6 +102,14 @@ export default function App() {
   const [runTrace, setRunTrace] = useState<RunTraceDto>();
   const [runTraceLoading, setRunTraceLoading] = useState(false);
   const [runTraceError, setRunTraceError] = useState<string>();
+  const [historyDialogOpen, setHistoryDialogOpen] = useState(false);
+  const [chatWidth, setChatWidth] = useState(CHAT_DEFAULT_WIDTH);
+  const [chatWidthBounds, setChatWidthBounds] = useState<ChatWidthBounds>({
+    min: CHAT_MIN_WIDTH,
+    max: CHAT_DEFAULT_WIDTH,
+  });
+  const [chatResizing, setChatResizing] = useState(false);
+  const appShellRef = useRef<HTMLElement>(null);
   const messagesPanelRef = useRef<HTMLDivElement>(null);
   const autoScrollPinnedRef = useRef(true);
   const historyRequestIdRef = useRef(0);
@@ -97,6 +118,25 @@ export default function App() {
   const activeAgentIdRef = useRef<string | undefined>(undefined);
   const capabilityRequestIdRef = useRef(0);
   const learningRequestIdRef = useRef(0);
+  const chatWidthRef = useRef(chatWidth);
+  const chatResizeCleanupRef = useRef<(() => void) | undefined>(undefined);
+
+  const getAvailableShellWidth = useCallback(() => {
+    const shell = appShellRef.current;
+    if (!shell) return window.innerWidth;
+
+    const shellStyle = window.getComputedStyle(shell);
+    const horizontalPadding =
+      Number.parseFloat(shellStyle.paddingLeft) +
+      Number.parseFloat(shellStyle.paddingRight);
+    return shell.clientWidth - horizontalPadding;
+  }, []);
+
+  const updateChatWidth = useCallback((width: number) => {
+    const availableWidth = getAvailableShellWidth();
+    setChatWidthBounds(getChatWidthBounds(availableWidth));
+    setChatWidth(clampChatWidth(width, availableWidth));
+  }, [getAvailableShellWidth]);
 
   const loadSessionMessages = useCallback(async (
     sessionId: string,
@@ -202,8 +242,20 @@ export default function App() {
     void loadLearningProfile();
   }, [loadLearningProfile]);
 
+  useEffect(() => {
+    chatWidthRef.current = chatWidth;
+  }, [chatWidth]);
+
+  useEffect(() => {
+    const handleWindowResize = () => updateChatWidth(chatWidthRef.current);
+    handleWindowResize();
+    window.addEventListener("resize", handleWindowResize);
+    return () => window.removeEventListener("resize", handleWindowResize);
+  }, [updateChatWidth]);
+
   useEffect(() => () => {
     activeStreamRef.current?.abort();
+    chatResizeCleanupRef.current?.();
   }, []);
 
   useEffect(() => {
@@ -220,15 +272,15 @@ export default function App() {
     autoScrollPinnedRef.current = distanceFromBottom <= 48;
   };
 
-  const handleCreateSession = async () => {
-    if (loading) return;
+  const handleCreateSession = async (): Promise<boolean> => {
+    if (loading) return false;
 
     const requestId = ++historyRequestIdRef.current;
     setHistoryLoading(true);
     setHistoryError(undefined);
     try {
       const created = await createSession(userId);
-      if (historyRequestIdRef.current !== requestId) return;
+      if (historyRequestIdRef.current !== requestId) return false;
 
       setSessions((currentSessions) => [
         created,
@@ -241,10 +293,12 @@ export default function App() {
       setActiveSessionId(created.sessionId);
       setRunTrace(undefined);
       setRunTraceError(undefined);
+      return true;
     } catch {
       if (historyRequestIdRef.current === requestId) {
         setHistoryError("新建会话失败");
       }
+      return false;
     } finally {
       if (historyRequestIdRef.current === requestId) {
         setHistoryLoading(false);
@@ -252,18 +306,20 @@ export default function App() {
     }
   };
 
-  const handleSelectSession = async (sessionId: string) => {
-    if (loading || sessionId === activeSessionId) return;
+  const handleSelectSession = async (sessionId: string): Promise<boolean> => {
+    if (loading) return false;
+    if (sessionId === activeSessionId) return true;
 
     const requestId = ++historyRequestIdRef.current;
     setHistoryLoading(true);
     setHistoryError(undefined);
     try {
-      await loadSessionMessages(sessionId, requestId);
+      return await loadSessionMessages(sessionId, requestId);
     } catch {
       if (historyRequestIdRef.current === requestId) {
         setHistoryError("聊天记录加载失败");
       }
+      return false;
     } finally {
       if (historyRequestIdRef.current === requestId) {
         setHistoryLoading(false);
@@ -467,26 +523,114 @@ export default function App() {
     }
   };
 
+  const resizeChatBy = (delta: number) => {
+    updateChatWidth(chatWidthRef.current + delta);
+  };
+
+  const handleChatResizePointerDown = (
+    event: React.PointerEvent<HTMLDivElement>,
+  ) => {
+    if (event.button !== 0) return;
+
+    event.preventDefault();
+    chatResizeCleanupRef.current?.();
+
+    const startX = event.clientX;
+    const startWidth = chatWidthRef.current;
+
+    const handlePointerMove = (moveEvent: PointerEvent) => {
+      updateChatWidth(startWidth + moveEvent.clientX - startX);
+    };
+
+    const stopResize = () => {
+      setChatResizing(false);
+      window.removeEventListener("pointermove", handlePointerMove);
+      window.removeEventListener("pointerup", stopResize);
+      window.removeEventListener("pointercancel", stopResize);
+      chatResizeCleanupRef.current = undefined;
+    };
+
+    setChatResizing(true);
+    window.addEventListener("pointermove", handlePointerMove);
+    window.addEventListener("pointerup", stopResize);
+    window.addEventListener("pointercancel", stopResize);
+    chatResizeCleanupRef.current = stopResize;
+  };
+
+  const handleChatResizeKeyDown = (
+    event: React.KeyboardEvent<HTMLDivElement>,
+  ) => {
+    if (event.key === "ArrowLeft") {
+      event.preventDefault();
+      resizeChatBy(-40);
+    }
+    if (event.key === "ArrowRight") {
+      event.preventDefault();
+      resizeChatBy(40);
+    }
+  };
+
+  const appShellStyle = {
+    "--chat-panel-width": `${chatWidth}px`,
+  } as CSSProperties;
+
   return (
-    <main className="app-shell">
-      <SessionSidebar
+    <main
+      className={chatResizing ? "app-shell app-shell-resizing" : "app-shell"}
+      ref={appShellRef}
+      style={appShellStyle}
+    >
+      <SessionHistoryDialog
+        open={historyDialogOpen}
         sessions={sessions}
         activeSessionId={activeSessionId}
         loading={historyLoading}
         actionsDisabled={loading || deletingSessionId !== undefined}
         deletingSessionId={deletingSessionId}
         error={historyError}
-        onCreateSession={() => void handleCreateSession()}
-        onSelectSession={(sessionId) => void handleSelectSession(sessionId)}
+        onCreateSession={() => {
+          void handleCreateSession().then((created) => {
+            if (created) setHistoryDialogOpen(false);
+          });
+        }}
+        onSelectSession={(sessionId) => {
+          void handleSelectSession(sessionId).then((selected) => {
+            if (selected) setHistoryDialogOpen(false);
+          });
+        }}
         onDeleteSession={(sessionId) => void handleDeleteSession(sessionId)}
         onRetry={() => void loadSessions()}
+        onClose={() => setHistoryDialogOpen(false)}
       />
 
       <section className="chat-surface" aria-label="Agent Hub chat">
         <header className="app-header">
-          <div>
-            <h1>Agent Hub</h1>
-            <p>实时查看 Agent 的可观察工作过程</p>
+          <div className="app-title-group">
+            <button
+              type="button"
+              className="history-entry-button"
+              aria-label="打开聊天记录"
+              title="聊天记录"
+              onClick={() => setHistoryDialogOpen(true)}
+            >
+              <svg
+                aria-hidden="true"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M5 6h14" />
+                <path d="M5 12h14" />
+                <path d="M5 18h10" />
+              </svg>
+            </button>
+            <div>
+              <h1>Agent Hub</h1>
+              <p>实时查看 Agent 的可观察工作过程</p>
+            </div>
           </div>
           <div className="session-pill" title={activeSessionId}>
             {(activeSessionId ?? "no-session").slice(-8)}
@@ -604,6 +748,20 @@ export default function App() {
         </footer>
 
         <div className="backend-line">后端：{API_BASE_URL}</div>
+
+        <div
+          className="chat-resize-handle"
+          role="separator"
+          aria-label="拖动调整对话宽度"
+          aria-orientation="vertical"
+          aria-valuemin={CHAT_MIN_WIDTH}
+          aria-valuemax={chatWidthBounds.max}
+          aria-valuenow={chatWidth}
+          aria-valuetext={`${chatWidth}px`}
+          tabIndex={0}
+          onPointerDown={handleChatResizePointerDown}
+          onKeyDown={handleChatResizeKeyDown}
+        />
       </section>
 
       {(runTrace || runTraceLoading || runTraceError) && (

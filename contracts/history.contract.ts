@@ -10,7 +10,14 @@ import {
   toStreamChatBody,
 } from "../src/api/history.js";
 import { RunTracePanel } from "../src/chat/RunTracePanel.js";
+import { SessionHistoryDialog } from "../src/chat/SessionHistoryDialog.js";
 import { SessionSidebar } from "../src/chat/SessionSidebar.js";
+import {
+  CHAT_MIN_WIDTH,
+  RIGHT_RAIL_WIDTH,
+  clampChatWidth,
+  getChatWidthBounds,
+} from "../src/chat/chatLayout.js";
 import {
   mapPersistedMessages,
   replayRunEvents,
@@ -227,12 +234,96 @@ assert.match(sidebarHtml, /删除/);
 assert.match(sidebarHtml, /session-delete-action/);
 assert.match(sidebarHtml, /disabled=""/);
 
+const historyDialogHtml = renderToStaticMarkup(
+  createElement(SessionHistoryDialog, {
+    open: true,
+    sessions: [
+      {
+        sessionId: "session-a",
+        title: "第一段聊天",
+        createdAt: "2026-08-17T00:00:00Z",
+        updatedAt: "2026-08-17T00:01:00Z",
+      },
+    ],
+    activeSessionId: "session-a",
+    loading: false,
+    actionsDisabled: false,
+    onCreateSession: () => undefined,
+    onSelectSession: () => undefined,
+    onDeleteSession: () => undefined,
+    onRetry: () => undefined,
+    onClose: () => undefined,
+  }),
+);
+assert.match(historyDialogHtml, /role="dialog"/);
+assert.match(historyDialogHtml, /aria-modal="true"/);
+assert.match(historyDialogHtml, /聊天记录/);
+assert.match(historyDialogHtml, /新建/);
+assert.match(historyDialogHtml, /关闭聊天记录/);
+assert.match(historyDialogHtml, /第一段聊天/);
+assert.match(historyDialogHtml, /session-history-dialog/);
+
+const closedHistoryDialogHtml = renderToStaticMarkup(
+  createElement(SessionHistoryDialog, {
+    open: false,
+    sessions: [],
+    loading: false,
+    onCreateSession: () => undefined,
+    onSelectSession: () => undefined,
+    onDeleteSession: () => undefined,
+    onRetry: () => undefined,
+    onClose: () => undefined,
+  }),
+);
+assert.equal(closedHistoryDialogHtml, "");
+
 const appCss = readFileSync("src/App.css", "utf8");
 assert.match(
   appCss,
   /\.session-sidebar,\s*\.capability-panel,\s*\.learning-profile-panel\s*{[^}]*display:\s*grid/s,
 );
 assert.match(appCss, /\.session-list\s*{[^}]*overflow-y:\s*auto/s);
+assert.match(appCss, /\.history-entry-button/);
+assert.match(appCss, /\.session-history-backdrop/);
+assert.match(appCss, /\.session-history-dialog/);
+assert.match(appCss, /\.chat-resize-handle/);
+assert.match(appCss, /--chat-panel-width/);
+assert.match(appCss, /minmax\(600px,\s*var\(--chat-panel-width/);
+assert.match(appCss, /300px/);
+
+const dialogSource = readFileSync("src/chat/SessionHistoryDialog.tsx", "utf8");
+assert.match(dialogSource, /focusableSelector/);
+assert.match(dialogSource, /previousFocusedElementRef/);
+assert.match(dialogSource, /event\.key === "Tab"/);
+assert.match(dialogSource, /event\.shiftKey/);
+assert.match(dialogSource, /querySelectorAll/);
+assert.match(dialogSource, /previousFocusedElementRef\.current\?\.focus\(\)/);
+assert.match(dialogSource, /event\.target === event\.currentTarget/);
+
+const appSource = readFileSync("src/App.tsx", "utf8");
+assert.match(appSource, /Promise<boolean>/);
+assert.match(
+  appSource,
+  /handleCreateSession\(\)\.then\(\(created\) => {\s*if \(created\) setHistoryDialogOpen\(false\);/s,
+);
+assert.match(
+  appSource,
+  /handleSelectSession\(sessionId\)\.then\(\(selected\) => {\s*if \(selected\) setHistoryDialogOpen\(false\);/s,
+);
+assert.match(appSource, /aria-valuemin=\{CHAT_MIN_WIDTH\}/);
+assert.match(appSource, /aria-valuemax=\{chatWidthBounds\.max\}/);
+assert.match(appSource, /aria-valuenow=\{chatWidth\}/);
+assert.doesNotMatch(
+  appSource,
+  /handleCreateSession\(\)\.then\(\(\) => setHistoryDialogOpen\(false\)\)/,
+);
+
+assert.equal(CHAT_MIN_WIDTH, 600);
+assert.equal(RIGHT_RAIL_WIDTH, 300);
+assert.deepEqual(getChatWidthBounds(1180), { min: 600, max: 864 });
+assert.equal(clampChatWidth(480, 1180), 600);
+assert.equal(clampChatWidth(900, 1180), 864);
+assert.equal(clampChatWidth(720, 1180), 720);
 
 const runTraceHtml = renderToStaticMarkup(
   createElement(RunTracePanel, {
