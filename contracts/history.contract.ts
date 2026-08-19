@@ -14,8 +14,10 @@ import { SessionHistoryDialog } from "../src/chat/SessionHistoryDialog.js";
 import { SessionSidebar } from "../src/chat/SessionSidebar.js";
 import {
   CHAT_MIN_WIDTH,
-  RIGHT_RAIL_WIDTH,
+  RIGHT_RAIL_DEFAULT_WIDTH,
+  RIGHT_RAIL_MIN_WIDTH,
   clampChatWidth,
+  getDefaultChatWidth,
   getChatWidthBounds,
 } from "../src/chat/chatLayout.js";
 import {
@@ -288,8 +290,11 @@ assert.match(appCss, /\.session-history-backdrop/);
 assert.match(appCss, /\.session-history-dialog/);
 assert.match(appCss, /\.chat-resize-handle/);
 assert.match(appCss, /--chat-panel-width/);
+assert.match(appCss, /\.app-shell\s*{[^}]*width:\s*100%/s);
+assert.match(appCss, /\.app-shell\s*{[^}]*justify-content:\s*stretch/s);
 assert.match(appCss, /minmax\(600px,\s*var\(--chat-panel-width/);
-assert.match(appCss, /300px/);
+assert.match(appCss, /minmax\(300px,\s*1fr\)/);
+assert.match(appCss, /min-width:\s*300px/);
 
 const dialogSource = readFileSync("src/chat/SessionHistoryDialog.tsx", "utf8");
 assert.match(dialogSource, /focusableSelector/);
@@ -319,8 +324,10 @@ assert.doesNotMatch(
 );
 
 assert.equal(CHAT_MIN_WIDTH, 600);
-assert.equal(RIGHT_RAIL_WIDTH, 300);
+assert.equal(RIGHT_RAIL_MIN_WIDTH, 300);
+assert.equal(RIGHT_RAIL_DEFAULT_WIDTH, 420);
 assert.deepEqual(getChatWidthBounds(1180), { min: 600, max: 864 });
+assert.equal(getDefaultChatWidth(1180), 744);
 assert.equal(clampChatWidth(480, 1180), 600);
 assert.equal(clampChatWidth(900, 1180), 864);
 assert.equal(clampChatWidth(720, 1180), 720);

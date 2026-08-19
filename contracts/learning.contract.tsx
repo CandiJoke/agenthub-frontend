@@ -163,6 +163,12 @@ assert.match(css, /\.learning-profile-body\s*{[^}]*overflow-y:\s*auto/s);
 assert.match(css, /\.learning-profile-body\s*{[^}]*min-height:\s*0/s);
 assert.match(css, /\.learning-hexagon-canvas\s*{[^}]*height:\s*248px/s);
 assert.match(css, /\.learning-hexagon-legend\s*{[^}]*padding:\s*8px 12px 12px/s);
+assert.match(css, /\.learning-hexagon-legend span\s*{[^}]*font-weight:\s*650/s);
+
+const canvasSource = await readFile("src/chat/LearningHexagonCanvas.tsx", "utf8");
+assert.match(canvasSource, /drawSubjectLabel/);
+assert.match(canvasSource, /score\.label/);
+assert.match(canvasSource, /centerY \+ radius \+ 46/);
 
 const emptyHtml = renderToStaticMarkup(
   createElement(LearningProfilePanel, {

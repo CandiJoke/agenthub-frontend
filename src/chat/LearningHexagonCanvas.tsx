@@ -96,6 +96,22 @@ function drawSubjectHexagon(
   context.restore();
 }
 
+function drawSubjectLabel(
+  context: CanvasRenderingContext2D,
+  score: SubjectHexagonScore,
+  centerX: number,
+  centerY: number,
+  radius: number,
+) {
+  context.save();
+  context.fillStyle = subjectColors[score.subject];
+  context.font = "700 12px system-ui, sans-serif";
+  context.textAlign = "center";
+  context.textBaseline = "middle";
+  context.fillText(score.label, centerX, centerY + radius + 46);
+  context.restore();
+}
+
 export function LearningHexagonCanvas({ weaknesses }: LearningHexagonCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const scores = useMemo(
@@ -125,13 +141,16 @@ export function LearningHexagonCanvas({ weaknesses }: LearningHexagonCanvasProps
       const radius = Math.min(34, Math.max(28, chartWidth * 0.28));
       const centerY = 96;
       subjects.forEach((subject, index) => {
+        const score = scores[subject];
+        const centerX = chartWidth * index + chartWidth / 2;
         drawSubjectHexagon(
           context,
-          scores[subject],
-          chartWidth * index + chartWidth / 2,
+          score,
+          centerX,
           centerY,
           radius,
         );
+        drawSubjectLabel(context, score, centerX, centerY, radius);
       });
 
       if (weaknesses.length === 0) {

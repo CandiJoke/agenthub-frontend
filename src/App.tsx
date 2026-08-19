@@ -35,6 +35,7 @@ import {
   CHAT_DEFAULT_WIDTH,
   CHAT_MIN_WIDTH,
   clampChatWidth,
+  getDefaultChatWidth,
   getChatWidthBounds,
   type ChatWidthBounds,
 } from "./chat/chatLayout";
@@ -119,6 +120,7 @@ export default function App() {
   const capabilityRequestIdRef = useRef(0);
   const learningRequestIdRef = useRef(0);
   const chatWidthRef = useRef(chatWidth);
+  const chatWidthInitializedRef = useRef(false);
   const chatResizeCleanupRef = useRef<(() => void) | undefined>(undefined);
 
   const getAvailableShellWidth = useCallback(() => {
@@ -247,11 +249,26 @@ export default function App() {
   }, [chatWidth]);
 
   useEffect(() => {
-    const handleWindowResize = () => updateChatWidth(chatWidthRef.current);
+    const handleWindowResize = () => {
+      const availableWidth = getAvailableShellWidth();
+      setChatWidthBounds(getChatWidthBounds(availableWidth));
+
+      if (!chatWidthInitializedRef.current) {
+        const defaultWidth = getDefaultChatWidth(availableWidth);
+        chatWidthRef.current = defaultWidth;
+        setChatWidth(defaultWidth);
+        chatWidthInitializedRef.current = true;
+        return;
+      }
+
+      const clampedWidth = clampChatWidth(chatWidthRef.current, availableWidth);
+      chatWidthRef.current = clampedWidth;
+      setChatWidth(clampedWidth);
+    };
     handleWindowResize();
     window.addEventListener("resize", handleWindowResize);
     return () => window.removeEventListener("resize", handleWindowResize);
-  }, [updateChatWidth]);
+  }, [getAvailableShellWidth]);
 
   useEffect(() => () => {
     activeStreamRef.current?.abort();
