@@ -408,7 +408,8 @@ export default function App() {
 
     if (
       event.type === "tool_end" &&
-      (event.tool === "record_chinese_literacy_weakness" ||
+      (event.tool === "update_child_profile" ||
+        event.tool === "record_chinese_literacy_weakness" ||
         event.tool === "record_learning_weakness")
     ) {
       void loadLearningProfile();

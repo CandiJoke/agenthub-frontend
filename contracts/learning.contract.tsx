@@ -191,6 +191,9 @@ assert.match(canvasSource, /drawSubjectLabel/);
 assert.match(canvasSource, /score\.label/);
 assert.match(canvasSource, /centerY \+ radius \+ 46/);
 
+const appSource = await readFile("src/App.tsx", "utf8");
+assert.match(appSource, /event\.tool === "update_child_profile"/);
+
 const emptyHtml = renderToStaticMarkup(
   createElement(LearningProfilePanel, {
     profile,
