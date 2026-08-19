@@ -176,7 +176,6 @@ export function LearningHexagonCanvas({ weaknesses }: LearningHexagonCanvasProps
 
   return (
     <div className="learning-hexagon-block">
-      <p className="learning-hexagon-summary">按语文、英语、数学展示学习关注点</p>
       <canvas
         ref={canvasRef}
         className="learning-hexagon-canvas"
@@ -184,11 +183,6 @@ export function LearningHexagonCanvas({ weaknesses }: LearningHexagonCanvasProps
         height={CANVAS_HEIGHT}
         aria-label="语文、英语、数学学习画像六边形图"
       />
-      <div className="learning-hexagon-legend" aria-hidden="true">
-        {subjects.map((subject) => (
-          <span key={subject}>{subjectLabels[subject]}</span>
-        ))}
-      </div>
     </div>
   );
 }
